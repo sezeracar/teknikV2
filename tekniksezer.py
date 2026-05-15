@@ -63,18 +63,29 @@ if kaydet_butonu:
     st.success(f"{secilen_makine} kaydı başarıyla eklendi!")
 
 # --- 5. LİSTELEME VE EXCEL ---
+# --- 5. LİSTELEME VE EXCEL (GÜNCEL) ---
 st.divider()
 if os.path.exists(DB_FILE):
     veriler = pd.read_csv(DB_FILE)
     c1, c2 = st.columns([5, 1])
     with c1: st.subheader("📋 Kayıt Geçmişi")
     with c2:
-        output = io.BytesIO()
         try:
+            import openpyxl
+            output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 veriler.to_excel(writer, index=False, sheet_name='Rapor')
-            st.download_button(label="📥 Excel İndir", data=output.getvalue(), 
-                               file_name="teknik_rapor.xlsx", 
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        except: st.warning("Excel motoru bekleniyor...")
+            
+            st.download_button(
+                label="📥 Excel İndir", 
+                data=output.getvalue(), 
+                file_name="teknik_rapor.xlsx", 
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        except ImportError:
+            # Motor yüklenemezse kullanıcıya teknik uyarı verir
+            st.error("Excel motoru (openpyxl) eksik. Lütfen requirements.txt dosyasını kontrol edin.")
+        except Exception as e:
+            st.warning(f"Hazırlanıyor: {e}")
+            
     st.dataframe(veriler.sort_index(ascending=False), use_container_width=True)

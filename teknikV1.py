@@ -1,3 +1,33 @@
+# --- KÜTÜPHANE KONTROLÜ ---
+import streamlit as st
+import pandas as pd
+import io
+import os
+from datetime import datetime
+
+# Excel yazımı için gerekli motorun kontrolü
+try:
+    import openpyxl
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
+
+# ... (Kodun geri kalanı aynı kalabilir)
+
+# Excel indirme butonunun olduğu kısmı şu şekilde güncelle:
+if EXCEL_AVAILABLE:
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        veriler.to_excel(writer, index=False, sheet_name='BakimKayitlari')
+    
+    st.download_button(
+        label="📥 Excel İndir",
+        data=output.getvalue(),
+        file_name="teknik_ekip_rapor.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+else:
+    st.error("Excel oluşturma motoru (openpyxl) henüz yüklenmedi. Lütfen sayfayı yenileyin veya yöneticiyle iletişime geçin.")
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd

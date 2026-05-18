@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime
 import os
 
 # --- 1. VERİ TABANI VE YETKİLENDİRME AYARLARI ---
@@ -46,12 +46,11 @@ st.markdown("""
 
 st.title("🛠️ Teknik Ekip Arıza & Talep Yönetim Sistemi")
 
-# Uygulama Sekmeleri
-sekme_talep_ac, sekme_talep_kapat, sekme_rapor, sekme_grafik = st.tabs([
+# Sayfaları sekmeler halinde ayırıyoruz (Çakışmasız 3 Temel Sayfa)
+sekme_talep_ac, sekme_talep_kapat, sekme_rapor = st.tabs([
     "➕ Yeni Arıza Talebi Aç", 
     "✅ Açık Talepleri Kapat (Giriş Gerekli)", 
-    "📋 Tüm Kayıt Geçmişi & İndirme (Giriş Gerekli)",
-    "📊 MTTR & MTBF Grafik Analizi (Giriş Gerekli)"
+    "📋 Tüm Kayıt Geçmişi & İndirme (Giriş Gerekli)"
 ])
 
 # --- 3. SEKME: TALEP AÇMA (HERKESE AÇIK) ---
@@ -176,70 +175,3 @@ with sekme_rapor:
                 mime="text/csv"
             )
             st.dataframe(veriler.sort_index(ascending=False), use_container_width=True)
-
-# --- 6. SEKME: MTTR & MTBF YERLEŞİK ANALİZ PANELİ ---
-with sekme_grafik:
-    if kullanici_giris_kontrol("grafik_sayfasi"):
-        st.subheader("📊 Tarih Bazlı MTTR ve MTBF Performans Analizi")
-        
-        if os.path.exists(DB_FILE):
-            df_g = pd.read_csv(DB_FILE)
-            
-            col_t1, col_t2 = st.columns(2)
-            with col_t1:
-                bas_tarih = st.date_input("Analiz Başlangıç Tarihi", date(2026, 1, 1))
-            with col_t2:
-                bit_tarih = st.date_input("Analiz Bitiş Tarihi", datetime.now().date())
-                
-            if bas_tarih > bit_tarih:
-                st.error("Hata: Başlangıç tarihi bitiş tarihinden büyük olamaz!")
-            else:
-                # Tarih dönüşümleri ve filtreleme
-                df_g["Kayıt_P_Tarihi"] = pd.to_datetime(df_g["Kayıt Tarihi"], format="%d/%m/%Y %H:%M").dt.date
-                mask = (df_g["Kayıt_P_Tarihi"] >= bas_tarih) & (df_g["Kayıt_P_Tarihi"] <= bit_tarih)
-                filtrelenmiş_df = df_g[mask]
-                
-                toplam_gun = (bit_tarih - bas_tarih).days + 1
-                toplam_calisma_saati = toplam_gun * 24 # 7/24 çalışma varsayımı
-                
-                if filtrelenmiş_df.empty:
-                    st.info("Seçilen tarih aralığında herhangi bir arıza kaydı bulunamadı.")
-                else:
-                    kapali_analiz = filtrelenmiş_df[filtrelenmiş_df["Durum"] == "Kapalı"]
-                    
-                    if kapali_analiz.empty:
-                        st.info("Seçilen tarih aralığında kapatılmış arıza bulunmuyor. MTTR/MTBF hesaplanamaz.")
-                    else:
-                        # Gruplama ve Hesaplamalar
-                        makine_grup = kapali_analiz.groupby("Makine/Sistem").agg(
-                            Ariza_Sayisi=("Talep No", "count"),
-                            Toplam_Mudahale_Suresi=("Süre (Dk)", "sum")
-                        ).reset_index()
-                        
-                        # Metrik formülleri
-                        makine_grup["MTTR (Dk)"] = (makine_grup["Toplam_Mudahale_Suresi"] / makine_grup["Ariza_Sayisi"]).round(1)
-                        makine_grup["MTBF (Saat)"] = (toplam_calisma_saati / makine_grup["Ariza_Sayisi"]).round(1)
-                        
-                        st.write("---")
-                        g_col1, g_col2 = st.columns(2)
-                        
-                        with g_col1:
-                            st.markdown("### 🕒 Makine Bazlı MTTR (Ortalama Onarım Süresi - Dakika)")
-                            # Hata veren kütüphane yerine Streamlit'in kendi yerleşik çubuk grafiği
-                            chart_data_mttr = makine_grup.set_index("Makine/Sistem")[["MTTR (Dk)"]]
-                            st.bar_chart(chart_data_mttr, y_label="Dakika")
-                            st.caption("Düşük MTTR değeri, daha hızlı müdahale ve onarım anlamına gelir.")
-                            
-                        with g_col2:
-                            st.markdown("### 📈 Makine Bazlı MTBF (Arızalar Arası Ortalama Süre - Saat)")
-                            # Hata veren kütüphane yerine Streamlit'in kendi yerleşik çubuk grafiği
-                            chart_data_mtbf = makine_grup.set_index("Makine/Sistem")[["MTBF (Saat)"]]
-                            st.bar_chart(chart_data_mtbf, y_label="Saat")
-                            st.caption("Yüksek MTBF değeri, ekipmanın daha seyrek arıza yaptığını ve kararlı olduğunu gösterir.")
-                            
-                        st.write("---")
-                        st.markdown("### 📊 Detaylı Performans Veri Tablosu")
-                        st.dataframe(
-                            makine_grup[["Makine/Sistem", "Ariza_Sayisi", "MTTR (Dk)", "MTBF (Saat)"]], 
-                            use_container_width=True
-                        )

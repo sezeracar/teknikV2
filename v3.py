@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 import os
 
 # --- 1. VERİ TABANI VE YETKİLENDİRME AYARLARI ---
@@ -15,7 +15,6 @@ YETKILI_KULLANICILAR = {
 }
 
 def veritabani_hazirla():
-    # Küresel standartlara uygun yeni sütunlar (Öncelik, Vardiya, Kök Neden, Kaizen) eklendi
     sutunlar = [
         "Talep No", "Durum", "Arıza Öncelik", "Vardiya No", "Kayıt Tarihi", "Kapatma Tarihi", 
         "Bildiren", "Müdahale Eden", "Makine/Sistem", "Arıza Türü", "Arıza Tanımı", 
@@ -25,7 +24,6 @@ def veritabani_hazirla():
         df = pd.DataFrame(columns=sutunlar)
         df.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
     else:
-        # Mevcut veritabanı varsa eksik sütunları otomatik tamamla
         df = pd.read_csv(DB_FILE)
         for sutun in sutunlar:
             if sutun not in df.columns:
@@ -71,7 +69,6 @@ with sekme_talep_ac:
             secilen_makine = st.selectbox("Arızalı Makine/Sistem", makine_listesi)
             ariza_turu = st.selectbox("Arıza Kategorisi", ["Elektrik", "Mekanik", "Tesisat", "İstif Makineleri"])
         with col2:
-            # Küresel Standart: Öncelik ve Vardiya Seçimi
             ariza_onceligi = st.selectbox("Arıza Kritiklik Seviyesi (SLA)", ["🔴 Yüksek (Sistem Durdu)", "🟡 Orta (Sistem Yavaş)", "🔵 Düşük (Planlı Bakım)"])
             vardiya_no = st.selectbox("Mevcut Vardiya", ["Vardiya 1 (08:00 - 16:00)", "Vardiya 2 (16:00 - 00:00)", "Vardiya 3 (00:00 - 08:00)"])
             bildirim_saati = st.time_input("Arıza Fark Edilme Saati", datetime.now().time())
@@ -125,13 +122,12 @@ def kullanici_giris_kontrol(sayfa_anahtari):
         st.rerun()
     return True
 
-# --- 4. SEKME: TALEP KAPATMA (SLA VE KÖK NEDEN ENTEGRASYONLU) ---
+# --- 4. SEKME: TALEP KAPATMA ---
 with sekme_talep_kapat:
     if kullanici_giris_kontrol("kapatma_sayfasi"):
         df_current = pd.read_csv(DB_FILE)
         acik_talepler = df_current[df_current["Durum"] == "Açık"]
         
-        # Küresel Standart: Akıllı Kırmızı SLA Alarm Şeridi
         kritik_talepler = acik_talepler[acik_talepler["Arıza Öncelik"].str.contains("Yüksek", na=False)]
         if not kritik_talepler.empty:
             st.error(f"🚨 **DİKKAT:** Şu an sistemde müdahale edilmeyi bekleyen **{len(kritik_talepler)}** adet ÜRETİM DURDURUCU (Kritik) arıza bulunmaktadır!")
@@ -159,11 +155,8 @@ with sekme_talep_kapat:
                     mudahale_suresi = st.number_input("Toplam Müdahale Süresi (Dakika)", min_value=1, step=1)
                 
                 cozum_detayi = st.text_area("Uygulanan Çözüm / Teknik Notlar")
-                
-                # Küresel Standart: TPM Kök Neden ve Kaizen Alanları
-                kok_neden = st.text_area("5 Neden Analizi (Arıza Neden Gerçekleşti? Kök Neden)", placeholder="Örn: Rulman yağsız kaldığı için sıkışmış, keçeler aşınmış...")
-                kaizen_onerisi = st.text_area("Kaizen Önerisi (Arızanın Tekrarlanmaması İçin Ne Yapılmalı?)", placeholder="Örn: Haftalık yağlama kontrol listesine bu rulman grubu eklenmeli...")
-                
+                kok_neden = st.text_area("5 Neden Analizi (Arıza Negen Gerçekleşti? Kök Neden)", placeholder="Örn: Rulman yağsız kaldığı için sıkışmış...")
+                kaizen_onerisi = st.text_area("Kaizen Önerisi (Arızanın Tekrarlanmaması İçin Ne Yapılmalı?)", placeholder="Örn: Haftalık kontrol listesine eklenmeli...")
                 malzemeler_kullanilan = st.text_area("Kullanılan Malzemeler", placeholder="Parça ve adet belirtiniz...")
                 
                 submit_kapat = st.form_submit_button("Talebi TPM Standartlarında Kapat")
@@ -177,10 +170,10 @@ with sekme_talep_kapat:
                         mudahale_suresi, cozum_detayi, kok_neden, kaizen_onerisi, malzemeler_kullanilan
                     ]
                     df_current.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
-                    st.success(f"Talep No #{secilen_id} başarıyla kapatıldı ve Kaizen arşivine eklendi!")
+                    st.success(f"Talep No #{secilen_id} başarıyla kapatıldı!")
                     st.rerun()
 
-# --- 5. SEKME: GELİŞMİŞ RAPORLAMA ARŞİVİ (FİLTRE ENTEGRASYONLU) ---
+# --- 5. SEKME: GELİŞMİŞ RAPORLAMA ARŞİVİ (TARİH FİLTRELİ SÜRÜM) ---
 with sekme_rapor:
     if kullanici_giris_kontrol("rapor_sayfasi"):
         st.subheader("📋 Gelişmiş Arıza Arşivi & Akıllı Filtreleme")
@@ -189,32 +182,56 @@ with sekme_rapor:
             veriler = pd.read_csv(DB_FILE)
             
             st.write("### 🔍 Akıllı Endüstriyel Süzgeçler")
-            col_f1, col_f2, col_f3 = st.columns(3)
             
+            # Kategori Süzgeçleri Üst Satırda
+            col_f1, col_f2, col_f3 = st.columns(3)
             with col_f1:
                 f_oncelik = st.selectbox("Öncelik Seviyesi Süzgeci", ["Tüm Öncelikler", "🔴 Yüksek (Sistem Durdu)", "🟡 Orta (Sistem Yavaş)", "🔵 Düşük (Planlı Bakım)"])
             with col_f2:
                 f_vardiya = st.selectbox("Vardiya Süzgeci", ["Tüm Vardiyalar", "Vardiya 1 (08:00 - 16:00)", "Vardiya 2 (16:00 - 00:00)", "Vardiya 3 (00:00 - 08:00)"])
             with col_f3:
                 f_durum = st.selectbox("Durum Süzgeci", ["Tüm Kayıtlar", "Açık", "Kapalı"])
+            
+            # YENİ: Tarih Süzgeçleri Alt Satırda
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                bas_tarih = st.date_input("Başlangıç Tarihi", date(2026, 1, 1)) # Varsayılan olarak 2026 başı
+            with col_t2:
+                bit_tarih = st.date_input("Bitiş Tarihi", datetime.now().date()) # Varsayılan olarak bugün
                 
-            # Filtreleme Mantığı
+            # --- FİLTRELEME MANTIĞI ---
             gosterilecek_veri = veriler.copy()
+            
+            # 1. Kategori Bazlı Filtrelemeler
             if f_oncelik != "Tüm Öncelikler":
                 gosterilecek_veri = gosterilecek_veri[gosterilecek_veri["Arıza Öncelik"] == f_oncelik]
             if f_vardiya != "Tüm Vardiyalar":
                 gosterilecek_veri = gosterilecek_veri[gosterilecek_veri["Vardiya No"] == f_vardiya]
             if f_durum != "Tüm Kayıtlar":
                 gosterilecek_veri = gosterilecek_veri[gosterilecek_veri["Durum"] == f_durum]
+            
+            # 2. Tarih Bazlı Zaman Aralığı Filtrelemesi
+            if bas_tarih > bit_tarih:
+                st.error("Hata: Başlangıç tarihi bitiş tarihinden büyük olamaz!")
+            else:
+                # CSV'deki metin biçimli tarihi geçici olarak sorgulama için sadece 'tarih' formatına çeviriyoruz
+                gosterilecek_veri["Gecici_Tarih"] = pd.to_datetime(gosterilecek_veri["Kayıt Tarihi"], format="%d/%m/%Y %H:%M").dt.date
                 
-            st.info(f"📊 Seçilen kriterlere uyan toplam **{len(gosterilecek_veri)}** kayıt listelenmektedir.")
+                # İki tarih arasında kalanları süzüyoruz
+                tarih_maskesi = (gosterilecek_veri["Gecici_Tarih"] >= bas_tarih) & (gosterilecek_veri["Gecici_Tarih"] <= bit_tarih)
+                gosterilecek_veri = gosterilecek_veri[tarih_maskesi]
+                
+                # Temizlik: Geçici oluşturulan sütunu kullanıcı görmesin diye siliyoruz
+                gosterilecek_veri = gosterilecek_veri.drop(columns=["Gecici_Tarih"])
+                
+            st.info(f"📊 Seçilen kriterlere ve tarih aralığına uyan toplam **{len(gosterilecek_veri)}** kayıt listelenmektedir.")
             
             # CSV İndirme Butonu
             csv_data = gosterilecek_veri.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
             st.download_button(
                 label="📥 Seçili Raporu İndir (CSV)",
                 data=csv_data,
-                file_name=f"teknik_kriter_raporu_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                file_name=f"teknik_tarihli_rapor_{datetime.now().strftime('%d_%m_%Y')}.csv",
                 mime="text/csv"
             )
             

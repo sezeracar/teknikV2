@@ -11,8 +11,8 @@ DB_FILE = "ariza_kayitlari.csv"
 YETKILI_KULLANICILAR = {
     "sezer": "1905",
     "teknik_admin": "1905",
-    "mudur": "1905"
-    "Birinci_Ekip": "1905",
+    "mudur": "1905",
+    "Birinci_Ekip": "1905"
 }
 
 def veritabani_hazirla():

@@ -12,6 +12,10 @@ YETKILI_KULLANICILAR = {
     "sezer": "1905",
     "teknik_admin": "1905",
     "mudur": "1905"
+    "1.ekip": "1905",
+    "2.ekip": "1905",
+    "3.ekip": "1905",
+    "4.ekip": "1905",
 }
 
 def veritabani_hazirla():

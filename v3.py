@@ -15,7 +15,6 @@ YETKILI_KULLANICILAR = {
 }
 
 def veritabani_hazirla():
-    # Arıza Kayıt Tablosu Kurulumu
     sutunlar = [
         "Talep No", "Durum", "Arıza Öncelik", "Vardiya No", "Kayıt Tarihi", "Kapatma Tarihi", 
         "Bildiren", "Müdahale Eden", "Makine/Sistem", "Arıza Türü", "Arıza Tanımı", 
@@ -31,7 +30,6 @@ def veritabani_hazirla():
                 df[sutun] = "-"
         df.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
 
-    # Stok Tablosu Kurulumu
     if not os.path.exists(STOK_FILE):
         baslangic_stok = {
             "Malzeme Kodu": ["M001", "M002", "M003", "M004", "M005"],
@@ -63,7 +61,6 @@ st.markdown("""
 
 st.title("🛠️ Teknik Ekip Gelişmiş Arıza & Envanter Yönetim Sistemi")
 
-# Uygulamayı 4 Sekmeye Çıkarıyoruz (Stok Yenileme Sekmesi Eklendi)
 sekme_talep_ac, sekme_talep_kapat, sekme_rapor, sekme_stok_yonetim = st.tabs([
     "➕ Yeni Arıza Talebi Aç", 
     "✅ Açık Talepleri Kapat (Giriş Gerekli)", 
@@ -135,7 +132,7 @@ def kullanici_giris_kontrol(sayfa_anahtari):
         st.rerun()
     return True
 
-# --- 4. SEKME: TALEP KAPATMA ---
+# --- 4. SEKME: TALEP KAPATMA (OTOMATİK ZAMAN DAMGALI) ---
 with sekme_talep_kapat:
     if kullanici_giris_kontrol("kapatma_sayfasi"):
         df_current = pd.read_csv(DB_FILE)
@@ -165,13 +162,15 @@ with sekme_talep_kapat:
                     mudahale_eden = st.text_input("Müdahale Eden Teknisyen", value=st.session_state.aktif_kullanici.capitalize())
                     mudahale_zamani = st.text_input("Müdahale Saat Aralığı", placeholder="Örn: 14:00 - 14:45")
                 with col2:
+                    # Geliştirme Adımı: Varsayılan olarak o anki canlı tarih ve saati çekip kutuya yazıyoruz
+                    canli_su_an = datetime.now().strftime("%d/%m/%Y %H:%M")
+                    kapatma_tarihi_girdisi = st.text_input("Kapatma Tarihi ve Saati", value=canli_su_an, help="Herhangi bir değişiklik yapılmazsa güncel zaman damgası işlenir.")
                     mudahale_suresi = st.number_input("Toplam Müdahale Süresi (Dakika)", min_value=1, step=1)
                 
                 cozum_detayi = st.text_area("Uygulanan Çözüm / Teknik Notlar")
                 kok_neden = st.text_area("5 Neden Analizi (Arıza Neden Gerçekleşti? Kök Neden)", placeholder="Örn: Rulman yağsız kaldığı için sıkışmış...")
                 kaizen_onerisi = st.text_area("Kaizen Önerisi (Arızanın Tekrarlanmaması İçin Ne Yapılmalı?)", placeholder="Örn: Haftalık kontrol listesine eklenmeli...")
                 
-                # Malzeme Seçimi
                 st.write("#### 📦 Kullanılan Malzeme Envanter Çıkışı")
                 df_stok_secim = pd.read_csv(STOK_FILE)
                 malzeme_listesi = ["Kullanılmadı"] + df_stok_secim["Malzeme Adı"].tolist()
@@ -195,11 +194,12 @@ with sekme_talep_kapat:
                                 df_stok_secim.to_csv(STOK_FILE, index=False, encoding="utf-8-sig")
                                 malzeme_bilgisi_metni = f"{secilen_malzeme} ({kullanilan_adet} Adet)"
                     
+                    # Veritabanına kullanıcının formda bıraktığı (değiştirmediyse canlı olan) tarihi işliyoruz
                     df_current.loc[df_current["Talep No"] == secilen_id, [
                         "Durum", "Kapatma Tarihi", "Müdahale Eden", "Müdahale Zamanı", 
                         "Süre (Dk)", "Çözüm", "Kök Neden (5 Why)", "Kaizen Önerisi", "Malzemeler"
                     ]] = [
-                        "Kapalı", datetime.now().strftime("%d/%m/%Y %H:%M"), mudahale_eden, mudahale_zamani, 
+                        "Kapalı", kapatma_tarihi_girdisi, mudahale_eden, mudahale_zamani, 
                         mudahale_suresi, cozum_detayi, kok_neden, kaizen_onerisi, malzeme_bilgisi_metni
                     ]
                     df_current.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
@@ -252,15 +252,13 @@ with sekme_rapor:
             )
             st.dataframe(gosterilecek_veri.sort_index(ascending=False), use_container_width=True)
 
-# --- 6. SEKME: YENİ SEPARAT STOK ENVANTER YÖNETİMİ PANELİ ---
+# --- 6. SEKME: STOK ENVANTER YÖNETİMİ PANELİ ---
 with sekme_stok_yonetim:
     if kullanici_giris_kontrol("stok_yonetim_sayfasi"):
         st.subheader("📦 Ambar Stok Kartları ve Miktar Güncelleme")
-        
         if os.path.exists(STOK_FILE):
             df_stok_yonet = pd.read_csv(STOK_FILE)
             
-            # Kritik seviyenin altındakileri uyar
             stok_alarm = df_stok_yonet[df_stok_yonet["Stok Miktarı"] <= df_stok_yonet["Kritik Seviye"]]
             for idx, row in stok_alarm.iterrows():
                 st.warning(f"⚠️ **ACİL SİPARİŞ:** {row['Malzeme Adı']} kritik seviyenin altında! Kalan: {row['Stok Miktarı']} adet.")
@@ -271,7 +269,6 @@ with sekme_stok_yonetim:
             with col_tablo:
                 st.markdown("### 📋 Güncel Envanter Tablosu")
                 st.dataframe(df_stok_yonet, use_container_width=True, hide_index=True)
-                
                 csv_stok_data = df_stok_yonet.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
                 st.download_button(
                     label="📥 Güncel Envanter Listesini İndir (CSV)",
@@ -283,14 +280,11 @@ with sekme_stok_yonetim:
             with col_form:
                 st.markdown("### 🔧 Stok Girişi / Güncelleme")
                 with st.form("stok_guncelleme_formu", clear_on_submit=True):
-                    # Güncellenecek malzemeyi seçtiriyoruz
                     secilen_guncelleme_malzemesi = st.selectbox("Stoku Güncellenecek Malzeme", df_stok_yonet["Malzeme Adı"].tolist())
                     yeni_net_stok = st.number_input("Yeni Güncel Stok Miktarını Girin", min_value=0, step=1, value=0)
-                    
                     submit_stok_guncelle = st.form_submit_button("Stok Miktarını Yenile")
                     
                     if submit_stok_guncelle:
-                        # Seçilen satırdaki miktarı kullanıcının girdiği yeni net değerle eşitle
                         df_stok_yonet.loc[df_stok_yonet["Malzeme Adı"] == secilen_guncelleme_malzemesi, "Stok Miktarı"] = yeni_net_stok
                         df_stok_yonet.to_csv(STOK_FILE, index=False, encoding="utf-8-sig")
                         st.success(f"✅ {secilen_guncelleme_malzemesi} stoku başarıyla {yeni_net_stok} olarak yenilendi!")

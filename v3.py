@@ -7,15 +7,10 @@ import os
 # --- 1. VERİ TABANI VE YETKİLENDİRME AYARLARI ---
 DB_FILE = "ariza_kayitlari.csv"
 
-# Yetkili Kullanıcı Listesi
 YETKILI_KULLANICILAR = {
     "sezer": "1905",
     "teknik_admin": "1905",
-    "mudur": "1905",
-    "a_ekip": "1905",
-    "b_ekip": "1905",
-    "c_ekip": "1905",
-    "d_ekip": "1905",
+    "mudur": "1905"
 }
 
 def veritabani_hazirla():
@@ -50,11 +45,11 @@ st.markdown("""
 
 st.title("🛠️ Teknik Ekip Arıza & Talep Yönetim Sistemi")
 
-# Sayfaları sekmeler halinde ayırıyoruz (Çakışmasız 3 Temel Sayfa)
+# Sayfaları sekmeler halinde ayırıyoruz
 sekme_talep_ac, sekme_talep_kapat, sekme_rapor = st.tabs([
     "➕ Yeni Arıza Talebi Aç", 
     "✅ Açık Talepleri Kapat (Giriş Gerekli)", 
-    "📋 Tüm Kayıt Geçmişi & İndirme (Giriş Gerekli)"
+    "📋 Tüm Kayıt Geçmişi & Raporlama (Giriş Gerekli)"
 ])
 
 # --- 3. SEKME: TALEP AÇMA (HERKESE AÇIK) ---
@@ -164,18 +159,39 @@ with sekme_talep_kapat:
                     st.success(f"Talep No #{secilen_id} başarıyla kapatıldı!")
                     st.rerun()
 
-# --- 5. SEKME: RAPORLAMA VE İNDİRME ---
+# --- 5. SEKME: RAPORLAMA VE İNDİRME (GÜNLÜK RAPOR ÖZELLİKLİ) ---
 with sekme_rapor:
     if kullanici_giris_kontrol("rapor_sayfasi"):
-        st.subheader("📋 Geçmiş Kayıt Arşivi")
+        st.subheader("📋 Arıza Kayıt Arşivi & Günlük Raporlama")
+        
         if os.path.exists(DB_FILE):
             veriler = pd.read_csv(DB_FILE)
             
-            csv_data = veriler.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            # --- YENİ: GÜNLÜK RAPOR FİLTRELEME ALANI ---
+            st.write("### 🔍 Rapor Seçenekleri")
+            rapor_turu = st.radio("Listeleme Türü", ["Tüm Geçmişi Göster", "Belirli Bir Günün Raporunu Çek"], horizontal=True)
+            
+            gosterilecek_veri = veriler.copy()
+            
+            if rapor_turu == "Belirli Bir Günün Raporunu Çek":
+                secilen_gun = st.date_input("Rapor Çekilecek Günü Seçin", datetime.now().date())
+                secilen_gun_str = secilen_gun.strftime("%d/%m/%Y")
+                
+                # 'Kayıt Tarihi' sütunundaki metnin başı seçilen güne eşit mi kontrol et
+                gosterilecek_veri = veriler[veriler["Kayıt Tarihi"].str.startswith(secilen_gun_str)]
+                st.info(f"📅 **{secilen_gun_str}** tarihine ait toplam **{len(gosterilecek_veri)}** kayıt bulundu.")
+            
+            # --- DİNAMİK İNDİRME BUTONU ---
+            csv_data = gosterilecek_veri.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            
+            dosya_adi = "tum_teknik_arsiv.csv" if rapor_turu == "Tüm Geçmişi Göster" else f"teknik_gunluk_rapor_{secilen_gun_str.replace('/', '_')}.csv"
+            
             st.download_button(
-                label="📥 Tüm Verileri İndir (CSV)",
+                label="📥 Listelenen Verileri İndir (CSV)",
                 data=csv_data,
-                file_name=f"teknik_bakim_arsiv_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                file_name=dosya_adi,
                 mime="text/csv"
             )
-            st.dataframe(veriler.sort_index(ascending=False), use_container_width=True)
+            
+            # Seçilen filtreye göre tabloyu ekranda göster
+            st.dataframe(gosterilecek_veri.sort_index(ascending=False), use_container_width=True)

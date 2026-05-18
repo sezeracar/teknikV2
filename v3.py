@@ -13,6 +13,7 @@ YETKILI_KULLANICILAR = {
     "teknik_admin": "1905",
     "mudur": "1905",
     "a_ekip": "1905",
+    "b_ekip": "1905",
 }
 
 def veritabani_hazirla():

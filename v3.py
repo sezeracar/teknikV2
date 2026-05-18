@@ -6,7 +6,7 @@ import os
 
 # --- 1. VERİ TABANI AYARLARI ---
 DB_FILE = "ariza_kayitlari.csv"
-DOGRU_SIFRE = "1905"  # Belirlediğiniz giriş şifresi
+DOGRU_SIFRE = "1905" 
 
 def veritabani_hazirla():
     sutunlar = [
@@ -21,8 +21,41 @@ def veritabani_hazirla():
 
 veritabani_hazirla()
 
-# --- 2. ARAYÜZ TASARIMI VE SAYFALAMA ---
+# --- 2. ARAYÜZ VE ÖZEL RENK (CSS) AYARLARI ---
 st.set_page_config(page_title="Teknik Bakım & Talep Yönetimi", layout="wide")
+
+# CSS ile Arka Planı Sarı, Yazıları Mor Yapıyoruz
+st.markdown("""
+    <style>
+        /* Ana arka planı sarı yapar */
+        .stApp {
+            background-color: #FFFF00 !important;
+        }
+        
+        /* Tüm başlıkları, etiketleri ve düz yazıları mor yapar */
+        h1, h2, h3, p, label, .stMarkdown, .stText {
+            color: #800080 !important;
+        }
+        
+        /* Form giriş kutularının yazı rengini mor yapar */
+        input, textarea, select {
+            color: #800080 !important;
+        }
+        
+        /* Sekme (Tab) isimlerinin mor görünmesini sağlar */
+        button[data-baseweb="tab"] {
+            color: #800080 !important;
+        }
+        
+        /* Form alanlarının arka planını hafif açık sarı/beyaz tonu yaparak okunurluğu artırır */
+        div[data-testid="stForm"] {
+            background-color: #FFFFE0 !important;
+            border: 2px solid #800080 !important;
+            border-radius: 10px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("🛠️ Teknik Ekip Arıza & Talep Yönetim Sistemi")
 
 # Sayfaları sekmeler halinde ayırıyoruz
@@ -64,11 +97,10 @@ with sekme_talep_ac:
             
             df_updated = pd.concat([df_current, pd.DataFrame([yeni_talep])], ignore_index=True)
             df_updated.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
-            st.success(f"Talep No #{yeni_id} başarıyla açıldı! Teknik ekibe iletildi.")
+            st.success(f"Talep No #{yeni_id} başarıyla açıldı!")
 
 # --- KORUMALI SAYFALAR İÇİN ŞİFRE KONTROL FONKSİYONU ---
 def sifrli_alan_kontrol():
-    """Şifre doğruysa True, yanlışsa veya girilmediyse False döner."""
     if "giris_yetkisi" not in st.session_state:
         st.session_state.giris_yetkisi = False
 

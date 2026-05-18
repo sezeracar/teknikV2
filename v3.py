@@ -6,7 +6,7 @@ import os
 
 # --- 1. VERİ TABANI VE YETKİLENDİRME AYARLARI ---
 DB_FILE = "ariza_kayitlari.csv"
-STOK_FILE = "yedek_parca_stok.csv"  # Yeni yedek parça veritabanı dosyası
+STOK_FILE = "yedek_parca_stok.csv"
 
 YETKILI_KULLANICILAR = {
     "sezer": "1905",
@@ -15,7 +15,7 @@ YETKILI_KULLANICILAR = {
 }
 
 def veritabani_hazirla():
-    # 1. Arıza Kayıt Tablosu Kurulumu
+    # Arıza Kayıt Tablosu Kurulumu
     sutunlar = [
         "Talep No", "Durum", "Arıza Öncelik", "Vardiya No", "Kayıt Tarihi", "Kapatma Tarihi", 
         "Bildiren", "Müdahale Eden", "Makine/Sistem", "Arıza Türü", "Arıza Tanımı", 
@@ -31,7 +31,7 @@ def veritabani_hazirla():
                 df[sutun] = "-"
         df.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
 
-    # 2. Yeni Stok Tablosu Kurulumu (Eğer yoksa başlangıç envanteri ile oluşturulur)
+    # Stok Tablosu Kurulumu
     if not os.path.exists(STOK_FILE):
         baslangic_stok = {
             "Malzeme Kodu": ["M001", "M002", "M003", "M004", "M005"],
@@ -63,11 +63,12 @@ st.markdown("""
 
 st.title("🛠️ Teknik Ekip Gelişmiş Arıza & Envanter Yönetim Sistemi")
 
-# Sayfaları sekmeler halinde ayırıyoruz
-sekme_talep_ac, sekme_talep_kapat, sekme_rapor = st.tabs([
+# Uygulamayı 4 Sekmeye Çıkarıyoruz (Stok Yenileme Sekmesi Eklendi)
+sekme_talep_ac, sekme_talep_kapat, sekme_rapor, sekme_stok_yonetim = st.tabs([
     "➕ Yeni Arıza Talebi Aç", 
     "✅ Açık Talepleri Kapat (Giriş Gerekli)", 
-    "📋 Gelişmiş Raporlama & Stok Durumu (Giriş Gerekli)"
+    "📋 Gelişmiş Raporlama Arşivi (Giriş Gerekli)",
+    "📦 Stok Envanter Yönetimi (Giriş Gerekli)"
 ])
 
 # --- 3. SEKME: TALEP AÇMA (HERKESE AÇIK) ---
@@ -134,7 +135,7 @@ def kullanici_giris_kontrol(sayfa_anahtari):
         st.rerun()
     return True
 
-# --- 4. SEKME: TALEP KAPATMA (STOK DÜŞÜM ENTEGRASYONLU) ---
+# --- 4. SEKME: TALEP KAPATMA ---
 with sekme_talep_kapat:
     if kullanici_giris_kontrol("kapatma_sayfasi"):
         df_current = pd.read_csv(DB_FILE)
@@ -170,11 +171,9 @@ with sekme_talep_kapat:
                 kok_neden = st.text_area("5 Neden Analizi (Arıza Neden Gerçekleşti? Kök Neden)", placeholder="Örn: Rulman yağsız kaldığı için sıkışmış...")
                 kaizen_onerisi = st.text_area("Kaizen Önerisi (Arızanın Tekrarlanmaması İçin Ne Yapılmalı?)", placeholder="Örn: Haftalık kontrol listesine eklenmeli...")
                 
-                # --- YENİ ENTEGRASYON: SEÇİMLİ STOK VE MALZEME TAKİBİ ---
+                # Malzeme Seçimi
                 st.write("#### 📦 Kullanılan Malzeme Envanter Çıkışı")
                 df_stok_secim = pd.read_csv(STOK_FILE)
-                
-                # Açılır liste için malzeme adlarını çekiyoruz
                 malzeme_listesi = ["Kullanılmadı"] + df_stok_secim["Malzeme Adı"].tolist()
                 secilen_malzeme = st.selectbox("Kullanılan Teknik Malzeme", malzeme_listesi)
                 kullanilan_adet = st.number_input("Kullanılan Adet / Miktar", min_value=0, step=1, value=0)
@@ -183,26 +182,19 @@ with sekme_talep_kapat:
                 
                 if submit_kapat:
                     malzeme_bilgisi_metni = "Kullanılmadı"
-                    
-                    # Eğer malzeme kullanıldıysa stok düşme işlemini tetikle
                     if secilen_malzeme != "Kullanılmadı" and kullanilan_adet > 0:
-                        # Seçilen malzemenin mevcut stok durumunu bul
                         guncel_stok_serisi = df_stok_secim.loc[df_stok_secim["Malzeme Adı"] == secilen_malzeme, "Stok Miktarı"]
-                        
                         if not guncel_stok_serisi.empty:
                             mevcut_stok = guncel_stok_serisi.values[0]
-                            
                             if mevcut_stok < kullanilan_adet:
                                 st.error(f"❌ Stok Yetersiz! Ambar stokunda sadece {mevcut_stok} adet var. Talep kapatılamadı.")
-                                st.stop()  # Kodun çalışmasını durdur, kaydetme yapma
+                                st.stop()
                             else:
-                                # Stok miktarını yeni değerle güncelle
                                 yeni_stok_degeri = mevcut_stok - kullanilan_adet
                                 df_stok_secim.loc[df_stok_secim["Malzeme Adı"] == secilen_malzeme, "Stok Miktarı"] = yeni_stok_degeri
                                 df_stok_secim.to_csv(STOK_FILE, index=False, encoding="utf-8-sig")
                                 malzeme_bilgisi_metni = f"{secilen_malzeme} ({kullanilan_adet} Adet)"
                     
-                    # Arıza kaydını güncelle ve kapat
                     df_current.loc[df_current["Talep No"] == secilen_id, [
                         "Durum", "Kapatma Tarihi", "Müdahale Eden", "Müdahale Zamanı", 
                         "Süre (Dk)", "Çözüm", "Kök Neden (5 Why)", "Kaizen Önerisi", "Malzemeler"
@@ -211,80 +203,95 @@ with sekme_talep_kapat:
                         mudahale_suresi, cozum_detayi, kok_neden, kaizen_onerisi, malzeme_bilgisi_metni
                     ]
                     df_current.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
-                    st.success(f"Talep No #{secilen_id} başarıyla kapatıldı! Parça envanterden düşüldü.")
+                    st.success(f"Talep No #{secilen_id} başarıyla kapatıldı!")
                     st.rerun()
 
-# --- 5. SEKME: GELİŞMİŞ RAPORLAMA VE STOK TAKİP PANELİ ---
+# --- 5. SEKME: GELİŞMİŞ RAPORLAMA ARŞİVİ ---
 with sekme_rapor:
     if kullanici_giris_kontrol("rapor_sayfasi"):
+        st.subheader("📋 Gelişmiş Arıza Arşivi & Filtreleme")
+        if os.path.exists(DB_FILE):
+            veriler = pd.read_csv(DB_FILE)
+            
+            col_f1, col_f2, col_f3 = st.columns(3)
+            with col_f1:
+                f_oncelik = st.selectbox("Öncelik Seviyesi", ["Tüm Öncelikler", "🔴 Yüksek (Sistem Durdu)", "🟡 Orta (Sistem Yavaş)", "🔵 Düşük (Planlı Bakım)"])
+            with col_f2:
+                f_vardiya = st.selectbox("Vardiya", ["Tüm Vardiyalar", "Vardiya 1 (08:00 - 16:00)", "Vardiya 2 (16:00 - 00:00)", "Vardiya 3 (00:00 - 08:00)"])
+            with col_f3:
+                f_durum = st.selectbox("Durum", ["Tüm Kayıtlar", "Açık", "Kapalı"])
+            
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                bas_tarih = st.date_input("Başlangıç Tarihi", date(2026, 1, 1))
+            with col_t2:
+                bit_tarih = st.date_input("Bitiş Tarihi", datetime.now().date())
+                
+            gosterilecek_veri = veriler.copy()
+            if f_oncelik != "Tüm Öncelikler":
+                gosterilecek_veri = gosterilecek_veri[gosterilecek_veri["Arıza Öncelik"] == f_oncelik]
+            if f_vardiya != "Tüm Vardiyalar":
+                gosterilecek_veri = gosterilecek_veri[gosterilecek_veri["Vardiya No"] == f_vardiya]
+            if f_durum != "Tüm Kayıtlar":
+                gosterilecek_veri = gosterilecek_veri[gosterilecek_veri["Durum"] == f_durum]
+            
+            if bas_tarih <= bit_tarih:
+                gosterilecek_veri["Gecici_Tarih"] = pd.to_datetime(gosterilecek_veri["Kayıt Tarihi"], format="%d/%m/%Y %H:%M").dt.date
+                tarih_maskesi = (gosterilecek_veri["Gecici_Tarih"] >= bas_tarih) & (gosterilecek_veri["Gecici_Tarih"] <= bit_tarih)
+                gosterilecek_veri = gosterilecek_veri[tarih_maskesi]
+                gosterilecek_veri = gosterilecek_veri.drop(columns=["Gecici_Tarih"])
+                
+            st.info(f"📊 Seçilen kriterlere uyan toplam **{len(gosterilecek_veri)}** kayıt listelenmektedir.")
+            
+            csv_data = gosterilecek_veri.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+            st.download_button(
+                label="📥 Seçili Raporu İndir (CSV)",
+                data=csv_data,
+                file_name=f"teknik_tarihli_rapor_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                mime="text/csv"
+            )
+            st.dataframe(gosterilecek_veri.sort_index(ascending=False), use_container_width=True)
+
+# --- 6. SEKME: YENİ SEPARAT STOK ENVANTER YÖNETİMİ PANELİ ---
+with sekme_stok_yonetim:
+    if kullanici_giris_kontrol("stok_yonetim_sayfasi"):
+        st.subheader("📦 Ambar Stok Kartları ve Miktar Güncelleme")
         
-        # Ekranı yan yana iki ana bölüme ayırıyoruz: Sol taraf Raporlama, Sağ taraf Canlı Ambar Stok Durumu
-        col_sol_rapor, col_sag_stok = st.columns([2, 1])
-        
-        with col_sol_rapor:
-            st.subheader("📋 Gelişmiş Arıza Arşivi & Filtreleme")
-            if os.path.exists(DB_FILE):
-                veriler = pd.read_csv(DB_FILE)
+        if os.path.exists(STOK_FILE):
+            df_stok_yonet = pd.read_csv(STOK_FILE)
+            
+            # Kritik seviyenin altındakileri uyar
+            stok_alarm = df_stok_yonet[df_stok_yonet["Stok Miktarı"] <= df_stok_yonet["Kritik Seviye"]]
+            for idx, row in stok_alarm.iterrows():
+                st.warning(f"⚠️ **ACİL SİPARİŞ:** {row['Malzeme Adı']} kritik seviyenin altında! Kalan: {row['Stok Miktarı']} adet.")
+            
+            st.write("---")
+            col_tablo, col_form = st.columns([2, 1])
+            
+            with col_tablo:
+                st.markdown("### 📋 Güncel Envanter Tablosu")
+                st.dataframe(df_stok_yonet, use_container_width=True, hide_index=True)
                 
-                # Endüstriyel Süzgeçler
-                col_f1, col_f2, col_f3 = st.columns(3)
-                with col_f1:
-                    f_oncelik = st.selectbox("Öncelik Seviyesi", ["Tüm Öncelikler", "🔴 Yüksek (Sistem Durdu)", "🟡 Orta (Sistem Yavaş)", "🔵 Düşük (Planlı Bakım)"])
-                with col_f2:
-                    f_vardiya = st.selectbox("Vardiya", ["Tüm Vardiyalar", "Vardiya 1 (08:00 - 16:00)", "Vardiya 2 (16:00 - 00:00)", "Vardiya 3 (00:00 - 08:00)"])
-                with col_f3:
-                    f_durum = st.selectbox("Durum", ["Tüm Kayıtlar", "Açık", "Kapalı"])
-                
-                col_t1, col_t2 = st.columns(2)
-                with col_t1:
-                    bas_tarih = st.date_input("Başlangıç Tarihi", date(2026, 1, 1))
-                with col_t2:
-                    bit_tarih = st.date_input("Bitiş Tarihi", datetime.now().date())
-                    
-                gosterilecek_veri = veriler.copy()
-                
-                if f_oncelik != "Tüm Öncelikler":
-                    gosterilecek_veri = gosterilecek_veri[gosterilecek_veri["Arıza Öncelik"] == f_oncelik]
-                if f_vardiya != "Tüm Vardiyalar":
-                    gosterilecek_veri = gosterilecek_veri[gosterilecek_veri["Vardiya No"] == f_vardiya]
-                if f_durum != "Tüm Kayıtlar":
-                    gosterilecek_veri = gosterilecek_veri[gosterilecek_veri["Durum"] == f_durum]
-                
-                if bas_tarih <= bit_tarih:
-                    gosterilecek_veri["Gecici_Tarih"] = pd.to_datetime(gosterilecek_veri["Kayıt Tarihi"], format="%d/%m/%Y %H:%M").dt.date
-                    tarih_maskesi = (gosterilecek_veri["Gecici_Tarih"] >= bas_tarih) & (gosterilecek_veri["Gecici_Tarih"] <= bit_tarih)
-                    gosterilecek_veri = gosterilecek_veri[tarih_maskesi]
-                    gosterilecek_veri = gosterilecek_veri.drop(columns=["Gecici_Tarih"])
-                
-                st.info(f"📊 Toplam **{len(gosterilecek_veri)}** kayıt listelenmektedir.")
-                
-                csv_data = gosterilecek_veri.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+                csv_stok_data = df_stok_yonet.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
                 st.download_button(
-                    label="📥 Seçili Raporu İndir (CSV)",
-                    data=csv_data,
-                    file_name=f"teknik_tarihli_rapor_{datetime.now().strftime('%d_%m_%Y')}.csv",
-                    mime="text/csv"
-                )
-                st.dataframe(gosterilecek_veri.sort_index(ascending=False), use_container_width=True)
-        
-        with col_sag_stok:
-            st.subheader("📦 Canlı Ambar Stok Durumu")
-            if os.path.exists(STOK_FILE):
-                df_stok_goster = pd.read_csv(STOK_FILE)
-                
-                # Kritik seviyenin altına düşen malzemeleri kırmızı renkle üstte uyaralım
-                stok_alarm = df_stok_goster[df_stok_goster["Stok Miktarı"] <= df_stok_goster["Kritik Seviye"]]
-                for idx, row in stok_alarm.iterrows():
-                    st.warning(f"⚠️ **KRİTİK STOK:** {row['Malzeme Adı']} kalan miktar: {row['Stok Miktarı']} adet! (Acil Sipariş)")
-                
-                # Güncel Envanter Tablosunu Göster
-                st.dataframe(df_stok_goster, use_container_width=True, hide_index=True)
-                
-                # Yedek parça listesini de harici rapor olarak indirebilme imkanı
-                csv_stok_data = df_stok_goster.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-                st.download_button(
-                    label="📥 Güncel Envanteri İndir (CSV)",
+                    label="📥 Güncel Envanter Listesini İndir (CSV)",
                     data=csv_stok_data,
-                    file_name=f"teknik_ambar_stok_{datetime.now().strftime('%d_%m_%Y')}.csv",
+                    file_name=f"teknik_stok_listesi_{datetime.now().strftime('%d_%m_%Y')}.csv",
                     mime="text/csv"
                 )
+            
+            with col_form:
+                st.markdown("### 🔧 Stok Girişi / Güncelleme")
+                with st.form("stok_guncelleme_formu", clear_on_submit=True):
+                    # Güncellenecek malzemeyi seçtiriyoruz
+                    secilen_guncelleme_malzemesi = st.selectbox("Stoku Güncellenecek Malzeme", df_stok_yonet["Malzeme Adı"].tolist())
+                    yeni_net_stok = st.number_input("Yeni Güncel Stok Miktarını Girin", min_value=0, step=1, value=0)
+                    
+                    submit_stok_guncelle = st.form_submit_button("Stok Miktarını Yenile")
+                    
+                    if submit_stok_guncelle:
+                        # Seçilen satırdaki miktarı kullanıcının girdiği yeni net değerle eşitle
+                        df_stok_yonet.loc[df_stok_yonet["Malzeme Adı"] == secilen_guncelleme_malzemesi, "Stok Miktarı"] = yeni_net_stok
+                        df_stok_yonet.to_csv(STOK_FILE, index=False, encoding="utf-8-sig")
+                        st.success(f"✅ {secilen_guncelleme_malzemesi} stoku başarıyla {yeni_net_stok} olarak yenilendi!")
+                        st.rerun()

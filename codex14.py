@@ -17,6 +17,40 @@ import time
 import requests
  
 # =============================================================================
+# SABITLER
+# =============================================================================
+ 
+MAKINE_LISTESI = [
+    "VNA-01 (Hat A)", "VNA-02 (Hat A)", "VNA-03 (Hat B)",
+    "RT-01 (Depo Sahası)", "RT-02 (Depo Sahası)",
+    "Konveyör Hattı 1", "Konveyör Hattı 2",
+    "Kompresör İstasyonu", "Elektrik Panosu MCC-1",
+    "Soğutma Ünitesi", "Forklift FLT-01", "Diğer"
+]
+ 
+ARIZA_TURLERI = {
+    "⚡ Elektrik":    ["Sigorta attı", "Motor arızası", "Sensör hatası", "PLC/Otomasyon", "Kablo kopması", "Diğer"],
+    "⚙️ Mekanik":    ["Rulman arızası", "Kayış/Zincir kopması", "Dişli hasarı", "Aşınma", "Titreşim", "Diğer"],
+    "🔧 Tesisat":    ["Boru sızıntısı", "Valf arızası", "Pompa sorunu", "Basınç düşüklüğü", "Diğer"],
+    "🖥️ Elektronik": ["HMI ekran hatası", "Ağ bağlantı sorunu", "Yazılım hatası", "Diğer"],
+    "🏗️ Yapısal":    ["Kafes/Yapı hasarı", "Zemin sorunu", "Diğer"]
+}
+ 
+ARIZA_ONCELIKLERI = {
+    "🔴 KRİTİK — Üretim Durdu":   {"renk": "#DC2626", "sla_dk": 30,   "puan": 1},
+    "🟠 YÜKSEK — Kısmi Aksama":   {"renk": "#EA580C", "sla_dk": 120,  "puan": 2},
+    "🟡 ORTA — Performans Düşük": {"renk": "#D97706", "sla_dk": 480,  "puan": 3},
+    "🟢 DÜŞÜK — Planlı Bakım":    {"renk": "#16A34A", "sla_dk": 1440, "puan": 4},
+}
+ 
+KULLANICILAR_DEFAULT = {
+    "admin":    {"sifre": hashlib.sha256("1905".encode()).hexdigest(), "rol": "Yönetici",  "tam_ad": "Sistem Yöneticisi"},
+    "sezer":    {"sifre": hashlib.sha256("1905".encode()).hexdigest(), "rol": "Yönetici",  "tam_ad": "Sezer Bey"},
+    "teknik01": {"sifre": hashlib.sha256("1905".encode()).hexdigest(), "rol": "Teknisyen", "tam_ad": "Teknisyen 1"},
+    "uretim":   {"sifre": hashlib.sha256("1905".encode()).hexdigest(), "rol": "Operatör",  "tam_ad": "Üretim Operatörü"},
+}
+ 
+# =============================================================================
 # SUPABASE BAĞLANTI KATMANI
 # =============================================================================
  

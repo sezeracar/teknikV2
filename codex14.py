@@ -5,7 +5,7 @@ TEKNIK BAKIM & ARIZA YÖNETİM SİSTEMİ v2.0
 Enterprise-Grade TPM & CMMS Platform — Supabase Edition
 =============================================================================
 """
-
+ 
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -15,17 +15,17 @@ import hashlib
 import json
 import time
 import requests
-
+ 
 # =============================================================================
 # SUPABASE BAĞLANTI KATMANI
 # =============================================================================
-
+ 
 def sb_url() -> str:
     return st.secrets["supabase"]["url"]
-
+ 
 def sb_key() -> str:
     return st.secrets["supabase"]["key"]
-
+ 
 def sb_headers() -> dict:
     return {
         "apikey":        sb_key(),
@@ -33,7 +33,7 @@ def sb_headers() -> dict:
         "Content-Type":  "application/json",
         "Prefer":        "return=representation"
     }
-
+ 
 def secrets_kontrol() -> bool:
     """Supabase secrets tanımlı mı kontrol et, değilse kullanıcıya açıklama göster."""
     try:
@@ -55,33 +55,33 @@ def secrets_kontrol() -> bool:
         """)
         st.stop()
         return False
-
+ 
 def sb_select(tablo: str, filtre: str = "") -> list:
     """Tablodan veri çek. filtre örn: 'durum=eq.Açık' """
     url = f"{sb_url()}/rest/v1/{tablo}?{filtre}&order=id.desc" if filtre else \
           f"{sb_url()}/rest/v1/{tablo}?order=id.desc"
     r = requests.get(url, headers=sb_headers(), timeout=10)
     return r.json() if r.ok else []
-
+ 
 def sb_insert(tablo: str, veri: dict) -> bool:
     url = f"{sb_url()}/rest/v1/{tablo}"
     r = requests.post(url, headers=sb_headers(), json=veri, timeout=10)
     return r.ok
-
+ 
 def sb_update(tablo: str, filtre: str, veri: dict) -> bool:
     url = f"{sb_url()}/rest/v1/{tablo}?{filtre}"
     h = sb_headers()
     h["Prefer"] = "return=minimal"
     r = requests.patch(url, headers=h, json=veri, timeout=10)
     return r.ok
-
+ 
 def sb_delete(tablo: str, filtre: str) -> bool:
     url = f"{sb_url()}/rest/v1/{tablo}?{filtre}"
     r = requests.delete(url, headers=sb_headers(), timeout=10)
     return r.ok
-
+ 
 # ── Yardımcı: Supabase listesini DataFrame'e çevir ────────────────────────
-
+ 
 def sb_to_df(rows: list, kolon_map: dict = None) -> pd.DataFrame:
     """Supabase JSON listesini Türkçe kolon adlı DataFrame'e çevirir."""
     if not rows:
@@ -90,9 +90,9 @@ def sb_to_df(rows: list, kolon_map: dict = None) -> pd.DataFrame:
     if kolon_map:
         df = df.rename(columns=kolon_map)
     return df
-
+ 
 # ── Kolon eşleştirme haritaları ───────────────────────────────────────────
-
+ 
 ARIZA_KOLON_MAP = {
     "talep_no":            "Talep No",
     "durum":               "Durum",
@@ -122,9 +122,9 @@ ARIZA_KOLON_MAP = {
     "fotograf_notu":       "Fotoğraf Notu",
     "kapatma_onayi":       "Kapatma Onayı",
 }
-
+ 
 ARIZA_KOLON_MAP_TERS = {v: k for k, v in ARIZA_KOLON_MAP.items()}
-
+ 
 STOK_KOLON_MAP = {
     "malzeme_kodu":   "Malzeme Kodu",
     "malzeme_adi":    "Malzeme Adı",
@@ -137,33 +137,33 @@ STOK_KOLON_MAP = {
     "tedarikci":      "Tedarikçi",
     "son_guncelleme": "Son Güncelleme",
 }
-
+ 
 # ── Supabase'den veri çekme fonksiyonları ─────────────────────────────────
-
+ 
 @st.cache_data(ttl=30)
 def ariza_df_getir() -> pd.DataFrame:
     rows = sb_select("ariza_kayitlari")
     return sb_to_df(rows, ARIZA_KOLON_MAP)
-
+ 
 @st.cache_data(ttl=30)
 def stok_df_getir() -> pd.DataFrame:
     rows = sb_select("stok")
     return sb_to_df(rows, STOK_KOLON_MAP)
-
+ 
 @st.cache_data(ttl=60)
 def kullanicilar_getir() -> dict:
     rows = sb_select("kullanicilar")
     return {r["kullanici_adi"]: {"sifre": r["sifre_hash"],
                                   "rol":   r["rol"],
                                   "tam_ad":r["tam_ad"]} for r in rows}
-
+ 
 def cache_temizle():
     ariza_df_getir.clear()
     stok_df_getir.clear()
     kullanicilar_getir.clear()
-
+ 
 # ── Veritabanı başlatma: tablolar boşsa varsayılan verileri yaz ───────────
-
+ 
 def veritabani_hazirla():
     # Stok tablosu boşsa başlangıç verisi ekle
     mevcut_stok = sb_select("stok")
@@ -180,7 +180,7 @@ def veritabani_hazirla():
         ]
         for s in baslangic:
             sb_insert("stok", s)
-
+ 
     # Kullanıcı tablosu boşsa varsayılan kullanıcıları ekle
     mevcut_kul = sb_select("kullanicilar")
     if not mevcut_kul:
@@ -192,14 +192,14 @@ def veritabani_hazirla():
         ]
         for k in varsayilanlar:
             sb_insert("kullanicilar", k)
-
+ 
 secrets_kontrol()
 veritabani_hazirla()
-
+ 
 # =============================================================================
 # YARDIMCI FONKSİYONLAR
 # =============================================================================
-
+ 
 def log_yaz(islem: str, detay: str = ""):
     kullanici = st.session_state.get("aktif_kullanici", "Sistem")
     sb_insert("sistem_log", {
@@ -208,7 +208,7 @@ def log_yaz(islem: str, detay: str = ""):
         "islem":    islem,
         "detay":    detay
     })
-
+ 
 def sla_hesapla(oncelik: str, acilis: str, kapanis: str = None) -> dict:
     sla_dk = ARIZA_ONCELIKLERI.get(oncelik, {}).get("sla_dk", 480)
     try:
@@ -223,47 +223,47 @@ def sla_hesapla(oncelik: str, acilis: str, kapanis: str = None) -> dict:
         }
     except:
         return {"gecen_dk": 0, "sla_dk": sla_dk, "oran": 0, "durum": "—"}
-
+ 
 def talep_no_uret() -> str:
     yil = datetime.now().year
     ay  = datetime.now().month
     prefix = f"ARZ-{yil}{ay:02d}-"
     rows = sb_select("ariza_kayitlari", f"talep_no=like.{prefix}*")
     return f"{prefix}{len(rows)+1:03d}"
-
+ 
 def sifre_hashle(sifre: str) -> str:
     return hashlib.sha256(sifre.encode()).hexdigest()
-
+ 
 def kullanicilari_yukle() -> dict:
     return kullanicilar_getir()
-
-
-
+ 
+ 
+ 
 # SAYFA KONFİGÜRASYONU & CSS
 # =============================================================================
-
+ 
 st.set_page_config(
     page_title="TeknikPro CMMS v2.0",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
+ 
 st.markdown("""
 <style>
 /* ── Genel Temel ─────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
+ 
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
     font-size: 14px;
 }
-
+ 
 /* ── Arka Plan ───────────────────────────────────────── */
 .stApp {
     background: linear-gradient(160deg, #0f172a 0%, #1e293b 60%, #0f172a 100%) !important;
 }
-
+ 
 /* ── Sidebar ─────────────────────────────────────────── */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #0c1220 0%, #111827 100%) !important;
@@ -272,7 +272,7 @@ html, body, [class*="css"] {
 [data-testid="stSidebar"] * { color: #cbd5e1 !important; }
 [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 { color: #93c5fd !important; }
-
+ 
 /* ── Metrik Kartlar ──────────────────────────────────── */
 [data-testid="metric-container"] {
     background: rgba(30,41,59,0.8) !important;
@@ -294,14 +294,14 @@ html, body, [class*="css"] {
     font-weight: 700 !important;
 }
 [data-testid="stMetricDelta"] { font-size: 12px !important; }
-
+ 
 /* ── Başlıklar ───────────────────────────────────────── */
 h1 { color: #e2e8f0 !important; font-weight: 700 !important; font-size: 26px !important; }
 h2 { color: #cbd5e1 !important; font-weight: 600 !important; font-size: 20px !important; }
 h3 { color: #94a3b8 !important; font-weight: 600 !important; font-size: 16px !important; }
 p, span, li { color: #cbd5e1 !important; }
 label { color: #94a3b8 !important; font-size: 13px !important; }
-
+ 
 /* ── Tab Navigasyon ──────────────────────────────────── */
 [data-testid="stTabs"] [role="tablist"] {
     background: rgba(15,23,42,0.6) !important;
@@ -323,7 +323,7 @@ label { color: #94a3b8 !important; font-size: 13px !important; }
     color: #93c5fd !important;
     border: 1px solid rgba(99,179,237,0.35) !important;
 }
-
+ 
 /* ── Form Elemanları ─────────────────────────────────── */
 [data-testid="stTextInput"] input,
 [data-testid="stTextArea"] textarea,
@@ -341,7 +341,7 @@ label { color: #94a3b8 !important; font-size: 13px !important; }
     border-color: rgba(99,179,237,0.5) !important;
     box-shadow: 0 0 0 3px rgba(59,130,246,0.12) !important;
 }
-
+ 
 /* ── Selectbox Dropdown Listesi ──────────────────────── */
 [data-testid="stSelectbox"] div[data-baseweb="select"] > div {
     background-color: #1e293b !important;
@@ -397,7 +397,7 @@ li[role="option"][aria-selected="true"] {
     background-color: rgba(15,23,42,0.9) !important;
     border-color: rgba(99,179,237,0.2) !important;
 }
-
+ 
 /* ── Butonlar ────────────────────────────────────────── */
 .stButton > button {
     background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
@@ -418,7 +418,7 @@ li[role="option"][aria-selected="true"] {
 .stButton > button:active {
     transform: translateY(0) !important;
 }
-
+ 
 /* ── Form Gönder Butonu ──────────────────────────────── */
 [data-testid="stFormSubmitButton"] > button {
     background: linear-gradient(135deg, #059669, #10b981) !important;
@@ -432,7 +432,7 @@ li[role="option"][aria-selected="true"] {
     background: linear-gradient(135deg, #047857, #059669) !important;
     box-shadow: 0 4px 16px rgba(5,150,105,0.35) !important;
 }
-
+ 
 /* ── Download Butonu ─────────────────────────────────── */
 [data-testid="stDownloadButton"] > button {
     background: rgba(30,41,59,0.8) !important;
@@ -446,7 +446,7 @@ li[role="option"][aria-selected="true"] {
     border-color: rgba(99,179,237,0.5) !important;
     background: rgba(30,41,59,1) !important;
 }
-
+ 
 /* ── Dataframe ───────────────────────────────────────── */
 [data-testid="stDataFrame"] {
     border: 1px solid rgba(99,179,237,0.12) !important;
@@ -456,14 +456,14 @@ li[role="option"][aria-selected="true"] {
 [data-testid="stDataFrame"] iframe {
     border-radius: 12px !important;
 }
-
+ 
 /* ── Bildirimler ─────────────────────────────────────── */
 [data-testid="stAlert"] {
     border-radius: 10px !important;
     border-left-width: 4px !important;
     font-size: 13px !important;
 }
-
+ 
 /* ── Expander ────────────────────────────────────────── */
 [data-testid="stExpander"] {
     background: rgba(30,41,59,0.5) !important;
@@ -475,7 +475,7 @@ li[role="option"][aria-selected="true"] {
     font-weight: 600 !important;
     font-size: 13px !important;
 }
-
+ 
 /* ── Number Input ────────────────────────────────────── */
 [data-testid="stNumberInput"] input {
     background: rgba(15,23,42,0.9) !important;
@@ -483,10 +483,10 @@ li[role="option"][aria-selected="true"] {
     border-radius: 8px !important;
     color: #e2e8f0 !important;
 }
-
+ 
 /* ── Çizgi ───────────────────────────────────────────── */
 hr { border-color: rgba(99,179,237,0.1) !important; }
-
+ 
 /* ── Özel Kart Bileşenleri ───────────────────────────── */
 .durum-karti {
     background: rgba(30,41,59,0.7);
@@ -520,18 +520,18 @@ hr { border-color: rgba(99,179,237,0.1) !important; }
 .sla-warn { background: rgba(220,38,38,0.15);  border:1px solid rgba(220,38,38,0.4);  color:#f87171; }
 </style>
 """, unsafe_allow_html=True)
-
-
+ 
+ 
 # =============================================================================
 # YETKİLENDİRME SİSTEMİ
 # =============================================================================
-
+ 
 def sidebar_giris():
     """Sidebar'da oturum yönetimi"""
     with st.sidebar:
         st.markdown("---")
         kullanicilar = kullanicilari_yukle()
-
+ 
         if not st.session_state.get("oturum_acik", False):
             st.markdown("### 🔐 Sistem Girişi")
             with st.form("sidebar_giris", clear_on_submit=True):
@@ -569,13 +569,13 @@ def sidebar_giris():
                 for k in ["oturum_acik","aktif_kullanici","aktif_tam_ad","aktif_rol"]:
                     st.session_state.pop(k, None)
                 st.rerun()
-
+ 
 def yetkili_mi(min_rol: str = "Operatör") -> bool:
     """Rol hiyerarşisi: Yönetici > Teknisyen > Operatör"""
     ROL_SIRASI = {"Yönetici": 3, "Teknisyen": 2, "Operatör": 1}
     kullanici_rol = st.session_state.get("aktif_rol", "")
     return ROL_SIRASI.get(kullanici_rol, 0) >= ROL_SIRASI.get(min_rol, 99)
-
+ 
 def giris_gerektir(min_rol: str = "Teknisyen") -> bool:
     if not st.session_state.get("oturum_acik", False):
         st.markdown("""
@@ -592,12 +592,12 @@ def giris_gerektir(min_rol: str = "Teknisyen") -> bool:
         st.error(f"⛔ Bu işlem için **{min_rol}** yetkisi gereklidir. Mevcut rolünüz: {st.session_state.aktif_rol}")
         return False
     return True
-
-
+ 
+ 
 # =============================================================================
 # SIDEBAR
 # =============================================================================
-
+ 
 with st.sidebar:
     st.markdown("""
     <div style="padding:20px 8px 8px;">
@@ -614,12 +614,15 @@ with st.sidebar:
       </div>
     </div>
     """, unsafe_allow_html=True)
-
+ 
     # Canlı sayaçlar
     try:
         df_sb = ariza_df_getir()
-        acik  = len(df_sb[df_sb["Durum"] == "Açık"])
-        kritik= len(df_sb[(df_sb["Durum"]=="Açık") & (df_sb["Öncelik"].str.startswith("🔴", na=False))])
+        if not df_sb.empty and "Durum" in df_sb.columns:
+            acik   = len(df_sb[df_sb["Durum"] == "Açık"])
+            kritik = len(df_sb[(df_sb["Durum"]=="Açık") & (df_sb["Öncelik"].str.startswith("🔴", na=False))])
+        else:
+            acik, kritik = 0, 0
         st.markdown(f"""
         <div style="display:flex;gap:8px;margin:16px 8px 8px;">
           <div style="flex:1;background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.3);
@@ -636,7 +639,7 @@ with st.sidebar:
         """, unsafe_allow_html=True)
     except:
         pass
-
+ 
     st.markdown("---")
     st.markdown("<div style='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#475569;padding-left:4px;margin-bottom:8px;'>HIZLI BİLGİ</div>", unsafe_allow_html=True)
     st.markdown(f"""
@@ -663,13 +666,13 @@ with st.sidebar:
       setInterval(tick, 1000);
     </script>
     """, height=28)
-
+ 
 sidebar_giris()
-
+ 
 # =============================================================================
 # ANA BAŞLIK
 # =============================================================================
-
+ 
 st.markdown("""
 <div style="margin-bottom:24px;">
   <h1 style="margin:0;padding:0;">🛡️ Teknik Bakım & Arıza Yönetim Sistemi</h1>
@@ -678,11 +681,11 @@ st.markdown("""
   </p>
 </div>
 """, unsafe_allow_html=True)
-
+ 
 # =============================================================================
 # SEKMELER
 # =============================================================================
-
+ 
 tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_ayar = st.tabs([
     "📊 Canlı Pano",
     "➕ Yeni Talep Aç",
@@ -691,102 +694,92 @@ tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_ayar = st.tabs([
     "📦 Stok Yönetimi",
     "⚙️ Sistem Ayarları"
 ])
-
-
+ 
+ 
 # =============================================================================
 # SEKME 1: CANLI PANO
 # =============================================================================
-
+ 
 with tab_pano:
     df = ariza_df_getir()
-
-    # ── KPI Kartlar ───────────────────────────────────────────────────
-    toplam   = len(df)
-    acik     = len(df[df["Durum"] == "Açık"])
-    kapali   = len(df[df["Durum"] == "Kapalı"])
-    kritik   = len(df[(df["Durum"]=="Açık") & (df["Öncelik"].str.startswith("🔴", na=False))])
-    sla_asan = len(df[df["SLA Durumu"].str.contains("Aşıldı", na=False)])
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1: st.metric("📋 Toplam Talep",    toplam,  delta=f"+{len(df[df['Açılış Tarihi'].str.startswith(datetime.now().strftime('%d/%m/%Y'), na=False)])} bugün")
-    with col2: st.metric("🟡 Açık Talepler",   acik,    delta=None)
-    with col3: st.metric("✅ Kapatılan",        kapali,  delta=f"Kapatma oranı: %{round(kapali/max(toplam,1)*100)}")
-    with col4: st.metric("🔴 Kritik Açık",      kritik,  delta="acil müdahale" if kritik > 0 else "Temiz")
-    with col5: st.metric("⚠️ SLA Aşımı",       sla_asan, delta=None)
-
-    st.markdown("---")
-
-    if len(df) == 0:
-        st.info("📭 Sistemde henüz kayıt bulunmuyor. 'Yeni Talep Aç' sekmesinden ilk arızayı ekleyin.")
+ 
+    if df.empty or "Durum" not in df.columns:
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1: st.metric("Toplam Talep", 0)
+        with col2: st.metric("Acik Talepler", 0)
+        with col3: st.metric("Kapatilan", 0)
+        with col4: st.metric("Kritik Acik", 0)
+        with col5: st.metric("SLA Asimi", 0)
+        st.markdown("---")
+        st.info("Sistemde henuz kayit bulunmuyor. Yeni Talep Ac sekmesinden ilk arizayi ekleyin.")
     else:
-        # ── Grafikler ─────────────────────────────────────────────────
+        toplam   = len(df)
+        acik     = len(df[df["Durum"] == "Açık"])
+        kapali   = len(df[df["Durum"] == "Kapalı"])
+        kritik   = len(df[(df["Durum"] == "Açık") & (df["Öncelik"].str.startswith("🔴", na=False))])
+        sla_asan = len(df[df["SLA Durumu"].str.contains("Aşıldı", na=False)])
+ 
+        col1, col2, col3, col4, col5 = st.columns(5)
+        bugun = datetime.now().strftime("%d/%m/%Y")
+        bugun_sayi = len(df[df["Açılış Tarihi"].str.startswith(bugun, na=False)]) if "Açılış Tarihi" in df.columns else 0
+        with col1: st.metric("Toplam Talep", toplam, delta=f"+{bugun_sayi} bugun")
+        with col2: st.metric("Acik Talepler", acik)
+        with col3: st.metric("Kapatilan", kapali, delta=f"Kapatma orani: %{round(kapali/max(toplam,1)*100)}")
+        with col4: st.metric("Kritik Acik", kritik, delta="acil mudahale" if kritik > 0 else "Temiz")
+        with col5: st.metric("SLA Asimi", sla_asan)
+ 
+        st.markdown("---")
         col_g1, col_g2 = st.columns(2)
-
         with col_g1:
-            st.markdown("#### Öncelik Bazlı Açık Talepler")
+            st.markdown("#### Oncelik Bazli Acik Talepler")
             if acik > 0:
-                acik_df = df[df["Durum"] == "Açık"]
-                onc_say = acik_df["Öncelik"].value_counts()
+                acik_df2 = df[df["Durum"] == "Açık"]
+                onc_say = acik_df2["Öncelik"].value_counts()
                 onc_say.index = [i[:30] for i in onc_say.index]
                 st.bar_chart(onc_say, height=260)
             else:
-                st.info("Açık talep yok")
-
+                st.info("Acik talep yok")
         with col_g2:
-            st.markdown("#### Makine Bazlı Arıza Sayısı")
+            st.markdown("#### Makine Bazli Ariza Sayisi")
             mak_say = df["Makine"].value_counts().head(8)
             st.bar_chart(mak_say, height=260)
-
-        # ── Günlük Trend ──────────────────────────────────────────────
-        st.markdown("#### 30 Günlük Arıza Trendi")
+ 
+        st.markdown("#### 30 Gunluk Ariza Trendi")
         try:
             df_trend = df.copy()
             df_trend["Tarih"] = pd.to_datetime(
                 df_trend["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce"
             ).dt.date
-            son_30  = date.today() - timedelta(days=30)
+            son_30 = date.today() - timedelta(days=30)
             df_trend = df_trend[df_trend["Tarih"] >= son_30]
-            gunluk  = df_trend.groupby("Tarih").size().rename("Arıza Sayısı")
+            gunluk = df_trend.groupby("Tarih").size().rename("Arıza Sayısı")
             if len(gunluk) > 0:
                 st.line_chart(gunluk, height=200)
         except Exception as e:
-            st.caption(f"Trend verisi işlenemedi: {e}")
-
-        # ── Açık Talepler Listesi ──────────────────────────────────────
+            st.caption(f"Trend verisi islenemedi: {e}")
+ 
         st.markdown("---")
-        st.markdown("#### 🟡 Müdahale Bekleyen Açık Talepler")
-        acik_df = df[df["Durum"]=="Açık"].copy()
+        st.markdown("#### Mudahale Bekleyen Acik Talepler")
+        acik_df = df[df["Durum"] == "Açık"].copy()
         if acik_df.empty:
-            st.success("✅ Müdahale bekleyen açık talep bulunmuyor.")
+            st.success("Mudahale bekleyen acik talep bulunmuyor.")
         else:
-            # Kritik uyarı
             k_df = acik_df[acik_df["Öncelik"].str.startswith("🔴", na=False)]
             if not k_df.empty:
-                st.markdown(f"""
-                <div class="kritik-banner">
-                  <strong style="color:#f87171;">🚨 {len(k_df)} adet ÜRETİM DURDURUCU kritik arıza tespit edildi!</strong>
-                  <span style="color:#94a3b8;font-size:12px;margin-left:8px;">
-                    Makine(ler): {', '.join(k_df['Makine'].unique()[:3])}
-                  </span>
-                </div>
-                """, unsafe_allow_html=True)
-
-            goster_sutunlar = ["Talep No","Öncelik","Açılış Tarihi","Bildiren","Makine","Arıza Türü","Arıza Tanımı","SLA Durumu"]
-            goster_sutunlar = [s for s in goster_sutunlar if s in acik_df.columns]
-            st.dataframe(
-                acik_df[goster_sutunlar].sort_values("Açılış Tarihi", ascending=False),
-                use_container_width=True, hide_index=True
-            )
-
-
-# =============================================================================
-# SEKME 2: YENİ TALEP AÇ (HERKESE AÇIK)
-# =============================================================================
-
+                st.error(f"KRITIK: {len(k_df)} adet URETIM DURDURUCU ariza! Makine(ler): {', '.join(k_df['Makine'].unique()[:3])}")
+            goster = ["Talep No","Öncelik","Açılış Tarihi","Bildiren","Makine","Arıza Türü","Arıza Tanımı","SLA Durumu"]
+            goster = [s for s in goster if s in acik_df.columns]
+            st.dataframe(acik_df[goster], use_container_width=True, hide_index=True)
+ 
+ 
+        with tab_yeni:
+            pass
+ 
+ 
 with tab_yeni:
     st.markdown("### ➕ Yeni Arıza Bildirimi Oluştur")
     st.caption("Bu form tüm personele açıktır. Oturum açmadan da kullanılabilir.")
-
+ 
     with st.form("yeni_talep_formu", clear_on_submit=True):
         st.markdown("#### 👤 Bildiren Personel Bilgileri")
         col_b1, col_b2, col_b3 = st.columns(3)
@@ -800,7 +793,7 @@ with tab_yeni:
             vardiya = st.selectbox("Vardiya *", [
                 "Gündüz (08:00–16:00)", "Akşam (16:00–00:00)", "Gece (00:00–08:00)"
             ])
-
+ 
         st.markdown("#### 🏭 Arıza Lokasyonu & Tipi")
         col_m1, col_m2 = st.columns(2)
         with col_m1:
@@ -809,7 +802,7 @@ with tab_yeni:
         with col_m2:
             oncelik      = st.selectbox("Kritiklik Seviyesi (SLA) *", list(ARIZA_ONCELIKLERI.keys()))
             bildirim_saat= st.time_input("Arıza Fark Edilme Saati", datetime.now().time())
-
+ 
         alt_kategori = st.selectbox(
             "Alt Kategori",
             ARIZA_TURLERI[ariza_tur],
@@ -824,7 +817,7 @@ with tab_yeni:
             "Fotoğraf / Referans Notu",
             placeholder="Fotoğraf çekildiyse referans kodu veya açıklama girin"
         )
-
+ 
         # SLA bilgi kutusu
         sla_bilgi = ARIZA_ONCELIKLERI[oncelik]
         st.markdown(f"""
@@ -836,9 +829,9 @@ with tab_yeni:
           </span>
         </div>
         """, unsafe_allow_html=True)
-
+ 
         submit_yeni = st.form_submit_button("🚀 Arıza Talebi Oluştur", use_container_width=True)
-
+ 
         if submit_yeni:
             if not bildiren.strip():
                 st.error("❌ 'Ad Soyad' alanı zorunludur.")
@@ -871,19 +864,19 @@ with tab_yeni:
                 """)
                 time.sleep(1)
                 st.rerun()
-
-
+ 
+ 
 # =============================================================================
 # SEKME 3: TALEP KAPAT
 # =============================================================================
-
+ 
 with tab_kapat:
     if not giris_gerektir("Teknisyen"):
         pass
     else:
         df_k = ariza_df_getir()
         acik_k = df_k[df_k["Durum"]=="Açık"].copy()
-
+ 
         if acik_k.empty:
             st.success("🎉 Müdahale bekleyen açık talep bulunmuyor. Harika iş!")
         else:
@@ -896,7 +889,7 @@ with tab_kapat:
                   <span style="color:#94a3b8;font-size:12px;"> — Acil müdahale bekliyor</span>
                 </div>
                 """, unsafe_allow_html=True)
-
+ 
             # Talep seçimi
             col_s1, col_s2 = st.columns([2,1])
             with col_s1:
@@ -905,10 +898,10 @@ with tab_kapat:
                     axis=1
                 ).tolist()
                 secilen = st.selectbox("📋 Kapatılacak Talebi Seçin", secenekler)
-
+ 
             secilen_no = secilen.split("]")[0].replace("[","").strip()
             talep = df_k[df_k["Talep No"] == secilen_no].iloc[0]
-
+ 
             # Talep detay kartı
             sla_bilgi_g = sla_hesapla(talep["Öncelik"], talep["Açılış Tarihi"])
             sla_cls = "sla-ok" if "İçinde" in sla_bilgi_g["durum"] else "sla-warn"
@@ -944,7 +937,7 @@ with tab_kapat:
               </div>
             </div>
             """, unsafe_allow_html=True)
-
+ 
             # Kapatma Formu
             st.markdown("#### 🔧 Müdahale & Çözüm Bilgileri")
             with st.form("kapat_formu"):
@@ -967,13 +960,13 @@ with tab_kapat:
                     )
                     cozum_suresi   = st.number_input("Toplam Çözüm Süresi (Dakika) *", min_value=1, step=5, value=30)
                     malzeme_maliyet= st.number_input("Malzeme Maliyeti (TL)", min_value=0, step=50, value=0)
-
+ 
                 cozum_aciklama = st.text_area(
                     "Uygulanan Çözüm & Teknik Notlar *",
                     placeholder="Yapılan müdahaleyi detaylı açıklayın. Değiştirilen parça, ayarlama, sıfırlama vb.",
                     height=100
                 )
-
+ 
                 col_k3, col_k4 = st.columns(2)
                 with col_k3:
                     kok_neden   = st.selectbox("Kök Neden Kategorisi", [
@@ -985,7 +978,7 @@ with tab_kapat:
                     kapatma_onayi = st.selectbox("Kapatma Onayı", [
                         "Teknisyen Onayı", "Vardiya Amiri Onayı", "Bakım Müdürü Onayı"
                     ])
-
+ 
                 neden_analizi  = st.text_area(
                     "5 Neden Analizi",
                     placeholder="Neden 1: ...\nNeden 2: ...\nNeden 3: ...\nNeden 4: ...\nNeden 5 (Kök Neden): ...",
@@ -996,7 +989,7 @@ with tab_kapat:
                     placeholder="Arızanın tekrarlanmaması için neler yapılabilir?",
                     height=80
                 )
-
+ 
                 st.markdown("#### 📦 Kullanılan Malzemeler")
                 df_stok_k = stok_df_getir()
                 col_stk1, col_stk2 = st.columns(2)
@@ -1007,9 +1000,9 @@ with tab_kapat:
                     )
                 with col_stk2:
                     malzeme_adet  = st.number_input("Kullanılan Miktar", min_value=0, step=1, value=0)
-
+ 
                 submit_kapat = st.form_submit_button("✅ Talebi Kapat & Kaydet", use_container_width=True)
-
+ 
                 if submit_kapat:
                     if not cozum_aciklama.strip():
                         st.error("❌ Çözüm açıklaması zorunludur.")
@@ -1029,10 +1022,10 @@ with tab_kapat:
                                 "son_guncelleme": datetime.now().strftime("%d/%m/%Y")
                             })
                             malzeme_metni = f"{malzeme_secim} x {malzeme_adet}"
-
+ 
                         toplam_maliyet = isguc_maliyet + malzeme_maliyet
                         sla_s = sla_hesapla(talep["Öncelik"], talep["Açılış Tarihi"], kapatma_zaman)
-
+ 
                         # Arıza kaydını Supabase'de güncelle
                         sb_update("ariza_kayitlari", f"talep_no=eq.{secilen_no}", {
                             "durum":               "Kapalı",
@@ -1052,7 +1045,7 @@ with tab_kapat:
                             "kapatma_onayi":       str(kapatma_onayi),
                         })
                         cache_temizle()
-
+ 
                         log_yaz("TALEP KAPATILDI", f"{secilen_no} — {mudahale_eden} — {cozum_suresi} dk")
                         st.success(f"""
                         ✅ **Talep {secilen_no} başarıyla kapatıldı!**
@@ -1060,19 +1053,19 @@ with tab_kapat:
                         """)
                         time.sleep(1.5)
                         st.rerun()
-
-
+ 
+ 
 # =============================================================================
 # SEKME 4: RAPORLAMA & ARŞİV
 # =============================================================================
-
+ 
 with tab_rapor:
     if not giris_gerektir("Teknisyen"):
         pass
     else:
         st.markdown("### 📋 Arıza Arşivi & Gelişmiş Raporlama")
         df_r = ariza_df_getir()
-
+ 
         # ── Filtreler ──────────────────────────────────────────────────
         with st.expander("🔍 Filtrele & Ara", expanded=True):
             col_f1, col_f2, col_f3, col_f4 = st.columns(4)
@@ -1084,7 +1077,7 @@ with tab_rapor:
                 f_makine  = st.selectbox("Makine",   ["Tümü"] + MAKINE_LISTESI)
             with col_f4:
                 f_tur     = st.selectbox("Arıza Türü", ["Tümü"] + list(ARIZA_TURLERI.keys()))
-
+ 
             col_t1, col_t2, col_t3 = st.columns([2,2,2])
             with col_t1:
                 f_bas = st.date_input("Başlangıç", date(2025,1,1))
@@ -1092,7 +1085,7 @@ with tab_rapor:
                 f_bit = st.date_input("Bitiş",     date.today())
             with col_t3:
                 f_arama = st.text_input("🔍 Metin Ara", placeholder="Talep no, personel, makine...")
-
+ 
         # Filtre uygula
         goster = df_r.copy()
         if f_durum   != "Tümü": goster = goster[goster["Durum"]   == f_durum]
@@ -1106,7 +1099,7 @@ with tab_rapor:
             goster["_tarih"] = pd.to_datetime(goster["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
             goster = goster[(goster["_tarih"] >= f_bas) & (goster["_tarih"] <= f_bit)].drop(columns=["_tarih"])
         except: pass
-
+ 
         # Özet satır
         col_oz1, col_oz2, col_oz3, col_oz4 = st.columns(4)
         with col_oz1: st.metric("Kayıt Sayısı", len(goster))
@@ -1122,7 +1115,7 @@ with tab_rapor:
             try:    sla_asan_r = len(goster[goster["SLA Durumu"].str.contains("Aşıldı",na=False)])
             except: sla_asan_r = 0
             st.metric("SLA Aşımı", sla_asan_r)
-
+ 
         # İndir
         col_dl1, col_dl2 = st.columns([1,4])
         with col_dl1:
@@ -1132,12 +1125,12 @@ with tab_rapor:
                 file_name=f"ariza_raporu_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                 mime="text/csv", use_container_width=True
             )
-
+ 
         st.dataframe(
             goster.sort_values("Açılış Tarihi", ascending=False),
             use_container_width=True, hide_index=True
         )
-
+ 
         # Seçili talebin tam detayı
         if len(goster) > 0:
             with st.expander("📄 Talep Detay Görüntüle"):
@@ -1156,19 +1149,19 @@ with tab_rapor:
                         for alan in alanlar[yari:]:
                             if alan in s.index and str(s[alan]) not in ["", "nan"]:
                                 st.markdown(f"**{alan}:** {s[alan]}")
-
-
+ 
+ 
 # =============================================================================
 # SEKME 5: STOK YÖNETİMİ
 # =============================================================================
-
+ 
 with tab_stok:
     if not giris_gerektir("Teknisyen"):
         pass
     else:
         st.markdown("### 📦 Yedek Parça & Sarf Malzeme Stok Yönetimi")
         df_st = stok_df_getir()
-
+ 
         # Kritik stok alarmları
         kritik_stok = df_st[df_st["Stok Miktarı"] <= df_st["Kritik Seviye"]]
         if not kritik_stok.empty:
@@ -1184,21 +1177,21 @@ with tab_stok:
                   </span>
                 </div>
                 """, unsafe_allow_html=True)
-
+ 
         # Stok doluluk oranı grafiği
         df_st["Doluluk %"] = (
             df_st["Stok Miktarı"] / df_st["Maksimum Stok"].replace(0, 1) * 100
         ).round(1).clip(upper=100)
-
+ 
         st.markdown("#### Stok Doluluk Oranları")
         st.bar_chart(
             df_st.set_index("Malzeme Adı")["Doluluk %"],
             height=260
         )
-
+ 
         # Tablo + Güncelleme Formu
         col_tbl, col_form = st.columns([3, 2])
-
+ 
         with col_tbl:
             st.markdown("#### Güncel Envanter Tablosu")
             goster_sutunlar = [s for s in STOK_SUTUNLARI if s in df_st.columns]
@@ -1209,7 +1202,7 @@ with tab_stok:
                 file_name=f"stok_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv"
             )
-
+ 
         with col_form:
             st.markdown("#### Stok Girişi & Güncelleme")
             with st.form("stok_guncelle"):
@@ -1217,13 +1210,13 @@ with tab_stok:
                 islem_tipi  = st.radio("İşlem", ["Stok Girişi (Ekleme)", "Stok Çıkışı (Kullanım)", "Mutlak Değer Gir"], horizontal=False)
                 miktar      = st.number_input("Miktar", min_value=0, step=1, value=0)
                 aciklama    = st.text_input("Not / Tedarikçi", placeholder="Opsiyonel")
-
+ 
                 guncelle_btn = st.form_submit_button("💾 Kaydet", use_container_width=True)
                 if guncelle_btn:
                     df_st2 = stok_df_getir()
                     mask_s = df_st2["Malzeme Adı"] == secilen_mal
                     mevcut = int(df_st2.loc[mask_s, "Stok Miktarı"].values[0])
-
+ 
                     if "Ekleme" in islem_tipi:
                         yeni_m = mevcut + miktar
                     elif "Çıkış" in islem_tipi:
@@ -1233,7 +1226,7 @@ with tab_stok:
                         yeni_m = mevcut - miktar
                     else:
                         yeni_m = miktar
-
+ 
                     sb_update("stok", f"malzeme_adi=eq.{secilen_mal}", {
                         "stok_miktari": int(yeni_m),
                         "son_guncelleme": datetime.now().strftime("%d/%m/%Y")
@@ -1243,7 +1236,7 @@ with tab_stok:
                     st.success(f"✅ {secilen_mal}: {mevcut} → **{yeni_m}**")
                     time.sleep(1)
                     st.rerun()
-
+ 
             # Yeni malzeme ekle (sadece Yönetici)
             if yetkili_mi("Yönetici"):
                 st.markdown("---")
@@ -1280,20 +1273,20 @@ with tab_stok:
                             st.success(f"✅ {y_ad} eklendi!")
                             time.sleep(1)
                             st.rerun()
-
-
+ 
+ 
 # =============================================================================
 # SEKME 6: SİSTEM AYARLARI
 # =============================================================================
-
+ 
 with tab_ayar:
     if not giris_gerektir("Yönetici"):
         pass
     else:
         st.markdown("### ⚙️ Sistem Ayarları & Kullanıcı Yönetimi")
-
+ 
         col_a1, col_a2 = st.columns(2)
-
+ 
         with col_a1:
             st.markdown("#### 👥 Kullanıcı Listesi")
             kullanicilar = kullanicilari_yukle()
@@ -1305,9 +1298,9 @@ with tab_ayar:
                   <span class="sla-badge sla-ok" style="margin-left:8px;">{k_bilgi['rol']}</span>
                 </div>
                 """, unsafe_allow_html=True)
-
+ 
             st.markdown("---")
-
+ 
             # ── Rol / Bilgi Güncelle ──────────────────────────────────
             st.markdown("#### ✏️ Kullanıcı Düzenle")
             with st.form("kullanici_duzenle"):
@@ -1332,7 +1325,7 @@ with tab_ayar:
                 with col_duz2:
                     duz_sifre     = st.text_input("Yeni Şifre (boş bırakırsan değişmez)", type="password", placeholder="••••••")
                     duz_sifre_onay= st.text_input("Şifre Tekrar", type="password", placeholder="••••••")
-
+ 
                 guncelle_btn = st.form_submit_button("💾 Değişiklikleri Kaydet", use_container_width=True)
                 if guncelle_btn:
                     if duz_sifre and duz_sifre != duz_sifre_onay:
@@ -1349,9 +1342,9 @@ with tab_ayar:
                         log_yaz("KULLANICI GÜNCELLENDİ", f"{duz_secim} → rol:{duz_rol}")
                         st.success(f"✅ {duz_secim} güncellendi! Yeni rol: **{duz_rol}**")
                         st.rerun()
-
+ 
             st.markdown("---")
-
+ 
             # ── Kullanıcı Sil ────────────────────────────────────────
             st.markdown("#### 🗑️ Kullanıcı Sil")
             with st.form("kullanici_sil"):
@@ -1369,9 +1362,9 @@ with tab_ayar:
                     log_yaz("KULLANICI SİLİNDİ", sil_secim)
                     st.success(f"✅ {sil_secim} silindi.")
                     st.rerun()
-
+ 
             st.markdown("---")
-
+ 
             # ── Yeni Kullanıcı Ekle ───────────────────────────────────
             st.markdown("#### ➕ Yeni Kullanıcı Ekle")
             with st.form("yeni_kullanici"):
@@ -1398,7 +1391,7 @@ with tab_ayar:
                         log_yaz("KULLANICI OLUŞTURULDU", f"{y_kullanici} — {y_rol}")
                         st.success(f"✅ {y_tamad} ({y_rol}) oluşturuldu!")
                         st.rerun()
-
+ 
         with col_a2:
             st.markdown("#### 📜 Sistem Aktivite Logu")
             try:
@@ -1421,7 +1414,7 @@ with tab_ayar:
                     st.info("Henüz aktivite kaydı yok.")
             except Exception as e:
                 st.info(f"Log yüklenemedi: {e}")
-
+ 
             st.markdown("---")
             st.markdown("#### 🗄️ Veri Yedekleme")
             col_bk1, col_bk2 = st.columns(2)
@@ -1443,7 +1436,7 @@ with tab_ayar:
                         file_name=f"stok_db_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                         mime="text/csv", use_container_width=True
                     )
-
+ 
         # Tehlikeli Bölge
         st.markdown("---")
         with st.expander("🗑️ Tehlikeli İşlemler (Veri Temizleme)"):
@@ -1461,11 +1454,11 @@ with tab_ayar:
                     sb_delete("sistem_log", "id=gt.0")
                     st.success("Log temizlendi.")
                     st.rerun()
-
+ 
 # =============================================================================
 # FOOTER
 # =============================================================================
-
+ 
 st.markdown("---")
 st.markdown("""
 <div style="text-align:center;padding:8px 0;font-size:11px;color:#334155;">
@@ -1473,3 +1466,4 @@ st.markdown("""
   <span style="color:#1d4ed8;">Enterprise Edition</span>
 </div>
 """, unsafe_allow_html=True)
+ 

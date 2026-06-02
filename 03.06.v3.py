@@ -327,16 +327,25 @@ def aktif_ariza_turleri() -> dict:
 @st.cache_data(ttl=30)
 def checklist_getir(bakim_plani_id: int) -> list:
     try:
-        rows = sb_select("bakim_checklist", f"bakim_plani_id=eq.{bakim_plani_id}&aktif=eq.true")
-        return sorted(rows, key=lambda r: r.get("sira", 0)) if rows else []
+        # Cache'i bypass ederek direkt Supabase'den çek
+        url = f"{sb_url()}/rest/v1/bakim_checklist?bakim_plani_id=eq.{int(bakim_plani_id)}&aktif=eq.true&order=sira.asc"
+        r = requests.get(url, headers=sb_headers(), timeout=10)
+        if r.ok:
+            rows = r.json()
+            return rows if isinstance(rows, list) else []
+        return []
     except Exception:
         return []
 
 @st.cache_data(ttl=10)
 def checklist_kayit_getir(talep_no: str) -> list:
     try:
-        rows = sb_select("bakim_checklist_kayit", f"ariza_talep_no=eq.{talep_no}")
-        return rows if rows else []
+        url = f"{sb_url()}/rest/v1/bakim_checklist_kayit?ariza_talep_no=eq.{talep_no}&order=id.asc"
+        r = requests.get(url, headers=sb_headers(), timeout=10)
+        if r.ok:
+            rows = r.json()
+            return rows if isinstance(rows, list) else []
+        return []
     except Exception:
         return []
 
@@ -923,11 +932,16 @@ with tab_kapat:
                                 st.write(f"**Eşleşen plan sayısı:** {len(bp_rows)}")
                                 if bp_rows:
                                     bp_id_test = bp_rows[0]["id"]
-                                    maddeler_test = sb_select("bakim_checklist", f"bakim_plani_id=eq.{bp_id_test}")
-                                    st.write(f"**Plan ID:** {bp_id_test} | **Checklist madde sayısı:** {len(maddeler_test)}")
+                                    # Cache bypass
+                                    url_t = f"{sb_url()}/rest/v1/bakim_checklist?bakim_plani_id=eq.{int(bp_id_test)}&order=sira.asc"
+                                    r_t   = requests.get(url_t, headers=sb_headers(), timeout=10)
+                                    maddeler_test = r_t.json() if r_t.ok else []
+                                    st.write(f"**Plan ID:** {bp_id_test} | **Madde sayısı:** {len(maddeler_test)} | **HTTP:** {r_t.status_code}")
                                     if maddeler_test:
                                         for m in maddeler_test:
                                             st.write(f"  - {m}")
+                                    else:
+                                        st.write(f"Ham yanıt: {r_t.text[:300]}")
 
                             # Önce gecikmiş olanı bul
                             bp_gecik = [r for r in bp_rows if r.get("durum") == "Gecikmiş"]

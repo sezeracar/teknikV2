@@ -324,10 +324,8 @@ def aktif_ariza_turleri() -> dict:
     db = ariza_turu_db()
     return db if db else ARIZA_TURLERI
 
-@st.cache_data(ttl=30)
 def checklist_getir(bakim_plani_id: int) -> list:
     try:
-        # Cache'i bypass ederek direkt Supabase'den çek
         url = f"{sb_url()}/rest/v1/bakim_checklist?bakim_plani_id=eq.{int(bakim_plani_id)}&aktif=eq.true&order=sira.asc"
         r = requests.get(url, headers=sb_headers(), timeout=10)
         if r.ok:
@@ -337,7 +335,6 @@ def checklist_getir(bakim_plani_id: int) -> list:
     except Exception:
         return []
 
-@st.cache_data(ttl=10)
 def checklist_kayit_getir(talep_no: str) -> list:
     try:
         url = f"{sb_url()}/rest/v1/bakim_checklist_kayit?ariza_talep_no=eq.{talep_no}&order=id.asc"
@@ -355,8 +352,6 @@ def cache_temizle():
     kullanicilar_getir.clear()
     makine_listesi_db.clear()
     ariza_turu_db.clear()
-    checklist_getir.clear()
-    checklist_kayit_getir.clear()
 
 @st.cache_data(ttl=3600)
 def veritabani_hazirla():
@@ -1004,7 +999,6 @@ with tab_kapat:
                                                         "zaman":      zaman_str if chk_val else "",
                                                         "not_":       not_val2
                                                     })
-                                            checklist_kayit_getir.clear()
                                             st.success("✅ Checklist kaydedildi!")
                                             time.sleep(0.5)
                                             st.rerun()
@@ -1798,7 +1792,6 @@ with tab_bakim:
                         with col_m2:
                             if st.button("🗑️", key=f"madde_sil_{m['id']}"):
                                 sb_update("bakim_checklist", f"id=eq.{m['id']}", {"aktif": False})
-                                checklist_getir.clear()
                                 st.rerun()
                 else:
                     st.info("Bu plan için henüz checklist maddesi eklenmemiş.")
@@ -1818,7 +1811,6 @@ with tab_bakim:
                             "madde":  ck_madde.strip(),
                             "aktif":  True
                         })
-                        checklist_getir.clear()
                         st.success(f"✅ '{ck_madde}' eklendi!")
                         time.sleep(0.5)
                         st.rerun()
@@ -1842,7 +1834,6 @@ with tab_bakim:
                                 "madde":  satir,
                                 "aktif":  True
                             })
-                        checklist_getir.clear()
                         st.success(f"✅ {len(satirlar)} madde eklendi!")
                         time.sleep(0.5)
                         st.rerun()

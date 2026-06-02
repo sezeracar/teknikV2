@@ -917,12 +917,17 @@ with tab_kapat:
 
                                 if maddeler:
                                     mevcut_kayitlar  = checklist_kayit_getir(talep["Talep No"])
-                                    tamamli_maddeler = {k["madde"] for k in mevcut_kayitlar if k.get("tamamlandi")}
+                                    # Sadece gerçek madde adlarıyla eşleşenleri say — mükerrer ve sahte kayıtları engelle
+                                    madde_adlari     = {m["madde"] for m in maddeler}
+                                    tamamli_maddeler = {
+                                        k["madde"] for k in mevcut_kayitlar
+                                        if k.get("tamamlandi") and k["madde"] in madde_adlari
+                                    }
                                     tum_tamam        = len(tamamli_maddeler) >= len(maddeler)
                                     teknisyen_adi    = st.session_state.get("aktif_tam_ad", "")
 
                                     # İlerleme göstergesi
-                                    progress = len(tamamli_maddeler) / max(len(maddeler), 1)
+                                    progress = min(len(tamamli_maddeler) / max(len(maddeler), 1), 1.0)
                                     renk = "#16A34A" if tum_tamam else "#D97706"
                                     st.markdown(f"""
                                     <div style="background:rgba(30,41,59,0.6);border:1px solid rgba(99,179,237,0.2);
@@ -952,18 +957,19 @@ with tab_kapat:
 
                                             durum_ikon = "✅" if zaten_tamam else "⬜"
                                             col_ck1, col_ck2, col_ck3 = st.columns([3, 3, 1])
+                                            m_id = m["id"]  # her zaman aynı tipi kullan
                                             with col_ck1:
-                                                chk_degerleri[m["id"]] = st.checkbox(
+                                                chk_degerleri[m_id] = st.checkbox(
                                                     f"{durum_ikon} **{m['sira']}.** {m['madde']}",
                                                     value=zaten_tamam,
-                                                    key=f"chk_{talep['Talep No']}_{m['id']}"
+                                                    key=f"chk_{talep['Talep No']}_{m_id}"
                                                 )
                                             with col_ck2:
-                                                not_degerleri[m["id"]] = st.text_input(
+                                                not_degerleri[m_id] = st.text_input(
                                                     "Not",
                                                     value=not_val,
                                                     placeholder="Not ekle...",
-                                                    key=f"not_{talep['Talep No']}_{m['id']}",
+                                                    key=f"not_{talep['Talep No']}_{m_id}",
                                                     label_visibility="collapsed"
                                                 )
                                             with col_ck3:
@@ -977,12 +983,19 @@ with tab_kapat:
 
                                         if kaydet_btn:
                                             zaman_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+                                            basari = True
                                             for m in maddeler:
-                                                chk_val  = chk_degerleri.get(m["id"], False)
-                                                not_val2 = not_degerleri.get(m["id"], "")
+                                                m_id     = m["id"]
+                                                # int ve str key'lerin ikisini de dene
+                                                chk_val  = chk_degerleri.get(m_id,
+                                                           chk_degerleri.get(str(m_id),
+                                                           chk_degerleri.get(int(m_id) if isinstance(m_id, str) else m_id, False)))
+                                                not_val2 = not_degerleri.get(m_id,
+                                                           not_degerleri.get(str(m_id),
+                                                           not_degerleri.get(int(m_id) if isinstance(m_id, str) else m_id, "")))
                                                 mevcut_k = next((k for k in mevcut_kayitlar if k["madde"] == m["madde"]), None)
                                                 if mevcut_k:
-                                                    sb_update("bakim_checklist_kayit",
+                                                    ok = sb_update("bakim_checklist_kayit",
                                                         f"id=eq.{mevcut_k['id']}", {
                                                             "tamamlandi": chk_val,
                                                             "yapan":  teknisyen_adi if chk_val else "",
@@ -990,7 +1003,7 @@ with tab_kapat:
                                                             "not_":   not_val2
                                                         })
                                                 else:
-                                                    sb_insert("bakim_checklist_kayit", {
+                                                    ok = sb_insert("bakim_checklist_kayit", {
                                                         "ariza_talep_no": talep["Talep No"],
                                                         "bakim_plani_id": bp_id,
                                                         "madde":      m["madde"],
@@ -999,8 +1012,13 @@ with tab_kapat:
                                                         "zaman":      zaman_str if chk_val else "",
                                                         "not_":       not_val2
                                                     })
-                                            st.success("✅ Checklist kaydedildi!")
-                                            time.sleep(0.5)
+                                                if not ok:
+                                                    basari = False
+                                            if basari:
+                                                st.success("✅ Checklist kaydedildi!")
+                                            else:
+                                                st.error("❌ Bazı maddeler kaydedilemedi. Supabase bağlantısını kontrol edin.")
+                                            time.sleep(0.8)
                                             st.rerun()
 
                                     # Tamamlanma durumu

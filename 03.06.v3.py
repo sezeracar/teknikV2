@@ -905,46 +905,14 @@ with tab_kapat:
                     ISCI_UCRET = 300  # TL/saat
 
                     # ── Periyodik bakımsa checklist göster ────────────
-                    tum_tamam = True  # varsayılan: normal arıza veya checklist yok
+                    tum_tamam = True
                     if "Periyodik Bakım" in str(talep.get("Arıza Tanımı", "")):
                         st.markdown("#### ☑️ Bakım Kontrol Listesi")
                         try:
-                            from urllib.parse import quote
                             makine_adi = talep.get("Makine", "")
-
-                            # Debug: ne arıyoruz
-                            with st.expander("🔍 Debug Bilgisi", expanded=True):
-                                st.write(f"**Aranan makine:** `{makine_adi}`")
-                                st.write(f"**Arıza Tanımı:** `{talep.get('Arıza Tanımı','')[:100]}`")
-
-                                # Tüm bakım planlarını çek
-                                tum_bp = sb_select("bakim_plani")
-                                st.write(f"**Toplam bakım planı sayısı:** {len(tum_bp)}")
-                                if tum_bp:
-                                    for bp in tum_bp:
-                                        st.write(f"  - ID:{bp['id']} | Makine:`{bp.get('makine','')}` | Durum:`{bp.get('durum','')}` | Eşleşme:`{bp.get('makine','') == makine_adi}`")
-
-                            # Tüm bakım planlarını çek, Python tarafında filtrele
-                            tum_bp = sb_select("bakim_plani")
-                            bp_rows = [r for r in tum_bp if r.get("makine","") == makine_adi]
-
-                            with st.expander("🔍 Debug 2", expanded=True):
-                                st.write(f"**Eşleşen plan sayısı:** {len(bp_rows)}")
-                                if bp_rows:
-                                    bp_id_test = bp_rows[0]["id"]
-                                    # Cache bypass
-                                    url_t = f"{sb_url()}/rest/v1/bakim_checklist?bakim_plani_id=eq.{int(bp_id_test)}&order=sira.asc"
-                                    r_t   = requests.get(url_t, headers=sb_headers(), timeout=10)
-                                    maddeler_test = r_t.json() if r_t.ok else []
-                                    st.write(f"**Plan ID:** {bp_id_test} | **Madde sayısı:** {len(maddeler_test)} | **HTTP:** {r_t.status_code}")
-                                    if maddeler_test:
-                                        for m in maddeler_test:
-                                            st.write(f"  - {m}")
-                                    else:
-                                        st.write(f"Ham yanıt: {r_t.text[:300]}")
-
-                            # Önce gecikmiş olanı bul
-                            bp_gecik = [r for r in bp_rows if r.get("durum") == "Gecikmiş"]
+                            tum_bp     = sb_select("bakim_plani")
+                            bp_rows    = [r for r in tum_bp if r.get("makine","") == makine_adi]
+                            bp_gecik   = [r for r in bp_rows if r.get("durum") == "Gecikmiş"]
                             if bp_gecik:
                                 bp_rows = bp_gecik
 

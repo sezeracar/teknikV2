@@ -903,12 +903,33 @@ with tab_kapat:
                             from urllib.parse import quote
                             makine_adi = talep.get("Makine", "")
 
+                            # Debug: ne arıyoruz
+                            with st.expander("🔍 Debug Bilgisi", expanded=True):
+                                st.write(f"**Aranan makine:** `{makine_adi}`")
+                                st.write(f"**Arıza Tanımı:** `{talep.get('Arıza Tanımı','')[:100]}`")
+
+                                # Tüm bakım planlarını çek
+                                tum_bp = sb_select("bakim_plani")
+                                st.write(f"**Toplam bakım planı sayısı:** {len(tum_bp)}")
+                                if tum_bp:
+                                    for bp in tum_bp:
+                                        st.write(f"  - ID:{bp['id']} | Makine:`{bp.get('makine','')}` | Durum:`{bp.get('durum','')}` | Eşleşme:`{bp.get('makine','') == makine_adi}`")
+
                             # Tüm bakım planlarını çek, Python tarafında filtrele
-                            # (URL encoding sorununu önlemek için)
                             tum_bp = sb_select("bakim_plani")
                             bp_rows = [r for r in tum_bp if r.get("makine","") == makine_adi]
 
-                            # Önce gecikmiş olanı bul, yoksa hepsine bak
+                            with st.expander("🔍 Debug 2", expanded=True):
+                                st.write(f"**Eşleşen plan sayısı:** {len(bp_rows)}")
+                                if bp_rows:
+                                    bp_id_test = bp_rows[0]["id"]
+                                    maddeler_test = sb_select("bakim_checklist", f"bakim_plani_id=eq.{bp_id_test}")
+                                    st.write(f"**Plan ID:** {bp_id_test} | **Checklist madde sayısı:** {len(maddeler_test)}")
+                                    if maddeler_test:
+                                        for m in maddeler_test:
+                                            st.write(f"  - {m}")
+
+                            # Önce gecikmiş olanı bul
                             bp_gecik = [r for r in bp_rows if r.get("durum") == "Gecikmiş"]
                             if bp_gecik:
                                 bp_rows = bp_gecik

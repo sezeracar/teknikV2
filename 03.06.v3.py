@@ -923,78 +923,94 @@ with tab_kapat:
                                     tum_tamam        = len(tamamli_maddeler) >= len(maddeler)
                                     teknisyen_adi    = st.session_state.get("aktif_tam_ad", "")
 
-                                    # İlerleme
+                                    # İlerleme göstergesi
                                     progress = len(tamamli_maddeler) / max(len(maddeler), 1)
                                     renk = "#16A34A" if tum_tamam else "#D97706"
                                     st.markdown(f"""
                                     <div style="background:rgba(30,41,59,0.6);border:1px solid rgba(99,179,237,0.2);
                                                 border-radius:10px;padding:14px 16px;margin-bottom:12px;">
                                       <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-                                        <span style="font-size:13px;font-weight:600;color:#e2e8f0;">Kontrol Listesi</span>
+                                        <span style="font-size:13px;font-weight:600;color:#e2e8f0;">☑️ Kontrol Listesi</span>
                                         <span style="font-size:13px;font-weight:700;color:{renk};">
                                           {len(tamamli_maddeler)}/{len(maddeler)} Tamamlandı
                                         </span>
                                       </div>
                                       <div style="background:rgba(15,23,42,0.5);border-radius:6px;height:8px;">
-                                        <div style="background:{renk};width:{int(progress*100)}%;height:8px;border-radius:6px;transition:width 0.3s;"></div>
+                                        <div style="background:{renk};width:{int(progress*100)}%;height:8px;border-radius:6px;"></div>
                                       </div>
                                     </div>""", unsafe_allow_html=True)
 
-                                    # Maddeler
-                                    for m in maddeler:
-                                        zaten_tamam = m["madde"] in tamamli_maddeler
-                                        mevcut_k = next((k for k in mevcut_kayitlar if k["madde"] == m["madde"]), None)
-                                        not_val  = mevcut_k.get("not_", "") if mevcut_k else ""
-                                        yapan    = mevcut_k.get("yapan", "") if mevcut_k else ""
-                                        zaman    = mevcut_k.get("zaman", "") if mevcut_k else ""
+                                    # Form içinde checkboxlar — tek "Kaydet" butonuyla toplu kayıt
+                                    with st.form(f"checklist_form_{talep['Talep No']}"):
+                                        st.markdown("**Tamamlanan maddeleri işaretleyin ve notlarınızı girin:**")
+                                        chk_degerleri = {}
+                                        not_degerleri = {}
 
-                                        durum_ikon = "✅" if zaten_tamam else "⬜"
-                                        col_ck1, col_ck2, col_ck3 = st.columns([3, 3, 1])
-                                        with col_ck1:
-                                            chk = st.checkbox(
-                                                f"{durum_ikon} **{m['sira']}.** {m['madde']}",
-                                                value=zaten_tamam,
-                                                key=f"chk_{talep['Talep No']}_{m['id']}"
-                                            )
-                                        with col_ck2:
-                                            madde_not = st.text_input(
-                                                "Not",
-                                                value=not_val,
-                                                placeholder="Not ekle...",
-                                                key=f"not_{talep['Talep No']}_{m['id']}",
-                                                label_visibility="collapsed"
-                                            )
-                                        with col_ck3:
-                                            if zaten_tamam and yapan:
-                                                st.caption(f"👤 {yapan}")
+                                        for m in maddeler:
+                                            zaten_tamam = m["madde"] in tamamli_maddeler
+                                            mevcut_k    = next((k for k in mevcut_kayitlar if k["madde"] == m["madde"]), None)
+                                            not_val     = mevcut_k.get("not_", "") if mevcut_k else ""
+                                            yapan       = mevcut_k.get("yapan", "") if mevcut_k else ""
 
-                                        # Değişiklik varsa kaydet
-                                        if chk != zaten_tamam:
-                                            if mevcut_k:
-                                                sb_update("bakim_checklist_kayit",
-                                                    f"id=eq.{mevcut_k['id']}", {
-                                                        "tamamlandi": chk,
-                                                        "yapan":  teknisyen_adi,
-                                                        "zaman":  datetime.now().strftime("%d/%m/%Y %H:%M"),
-                                                        "not_":   madde_not
+                                            durum_ikon = "✅" if zaten_tamam else "⬜"
+                                            col_ck1, col_ck2, col_ck3 = st.columns([3, 3, 1])
+                                            with col_ck1:
+                                                chk_degerleri[m["id"]] = st.checkbox(
+                                                    f"{durum_ikon} **{m['sira']}.** {m['madde']}",
+                                                    value=zaten_tamam,
+                                                    key=f"chk_{talep['Talep No']}_{m['id']}"
+                                                )
+                                            with col_ck2:
+                                                not_degerleri[m["id"]] = st.text_input(
+                                                    "Not",
+                                                    value=not_val,
+                                                    placeholder="Not ekle...",
+                                                    key=f"not_{talep['Talep No']}_{m['id']}",
+                                                    label_visibility="collapsed"
+                                                )
+                                            with col_ck3:
+                                                if zaten_tamam and yapan:
+                                                    st.caption(f"👤 {yapan}")
+
+                                        kaydet_btn = st.form_submit_button(
+                                            "💾 Checklist Kaydet",
+                                            use_container_width=True
+                                        )
+
+                                        if kaydet_btn:
+                                            zaman_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+                                            for m in maddeler:
+                                                chk_val  = chk_degerleri.get(m["id"], False)
+                                                not_val2 = not_degerleri.get(m["id"], "")
+                                                mevcut_k = next((k for k in mevcut_kayitlar if k["madde"] == m["madde"]), None)
+                                                if mevcut_k:
+                                                    sb_update("bakim_checklist_kayit",
+                                                        f"id=eq.{mevcut_k['id']}", {
+                                                            "tamamlandi": chk_val,
+                                                            "yapan":  teknisyen_adi if chk_val else "",
+                                                            "zaman":  zaman_str if chk_val else "",
+                                                            "not_":   not_val2
+                                                        })
+                                                else:
+                                                    sb_insert("bakim_checklist_kayit", {
+                                                        "ariza_talep_no": talep["Talep No"],
+                                                        "bakim_plani_id": bp_id,
+                                                        "madde":      m["madde"],
+                                                        "tamamlandi": chk_val,
+                                                        "yapan":      teknisyen_adi if chk_val else "",
+                                                        "zaman":      zaman_str if chk_val else "",
+                                                        "not_":       not_val2
                                                     })
-                                            else:
-                                                sb_insert("bakim_checklist_kayit", {
-                                                    "ariza_talep_no": talep["Talep No"],
-                                                    "bakim_plani_id": bp_id,
-                                                    "madde":      m["madde"],
-                                                    "tamamlandi": chk,
-                                                    "yapan":      teknisyen_adi,
-                                                    "zaman":      datetime.now().strftime("%d/%m/%Y %H:%M"),
-                                                    "not_":       madde_not
-                                                })
                                             checklist_kayit_getir.clear()
+                                            st.success("✅ Checklist kaydedildi!")
+                                            time.sleep(0.5)
                                             st.rerun()
 
+                                    # Tamamlanma durumu
                                     if not tum_tamam:
                                         st.warning(f"⚠️ Tüm maddeler tamamlanmadan talep kapatılamaz! ({len(tamamli_maddeler)}/{len(maddeler)})")
                                     else:
-                                        st.success("✅ Tüm kontrol maddeleri tamamlandı! Talebi kapatabilirsiniz.")
+                                        st.success("✅ Tüm kontrol maddeleri tamamlandı! Aşağıdan talebi kapatabilirsiniz.")
                                 else:
                                     st.info(f"ℹ️ Bu bakım planı (ID:{bp_id}) için henüz checklist maddesi eklenmemiş.")
                                     st.caption("→ 'Bakım Planları' sekmesi → Checklist Yönetimi bölümünden madde ekleyin.")

@@ -1258,6 +1258,51 @@ with tab_rapor:
                 try:    st.dataframe(g.sort_values("Açılış Tarihi",ascending=False), use_container_width=True, hide_index=True)
                 except: st.dataframe(g, use_container_width=True, hide_index=True)
 
+            # ── Makine Bazlı MTTR / MTBF Özeti ───────────────────────
+            st.markdown("---")
+            st.markdown("#### 📐 Makine Bazlı MTTR & MTBF Özeti")
+            try:
+                df_kapali = g[g["Durum"] == "Kapalı"].copy() if "Durum" in g.columns else pd.DataFrame()
+                if not df_kapali.empty and "Çözüm Süresi (Dk)" in df_kapali.columns:
+                    df_kapali["sure"] = pd.to_numeric(df_kapali["Çözüm Süresi (Dk)"], errors="coerce")
+                    df_kapali = df_kapali.dropna(subset=["sure","Makine"])
+
+                    if not df_kapali.empty:
+                        ozet_rows = []
+                        for makine_adi, grp in df_kapali.groupby("Makine"):
+                            mttr = round(grp["sure"].mean(), 1)
+                            toplam = len(grp)
+                            mtbf_dk = None
+                            avail   = None
+                            if "Kapatma Tarihi" in grp.columns and toplam >= 2:
+                                grp2 = grp.copy()
+                                grp2["kap"] = pd.to_datetime(grp2["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce")
+                                grp2 = grp2.dropna(subset=["kap"]).sort_values("kap")
+                                if len(grp2) >= 2:
+                                    fark    = grp2["kap"].diff().dropna()
+                                    mtbf_dk = round(fark.dt.total_seconds().mean() / 60, 1)
+                                    avail   = round(mtbf_dk / (mtbf_dk + mttr) * 100, 1)
+                            ozet_rows.append({
+                                "Makine":          makine_adi,
+                                "Arıza Sayısı":    toplam,
+                                "MTTR (dk)":       mttr,
+                                "MTBF (dk)":       mtbf_dk if mtbf_dk else "—",
+                                "Availability (%)": avail if avail else "—",
+                            })
+
+                        df_ozet = pd.DataFrame(ozet_rows).sort_values("Arıza Sayısı", ascending=False)
+                        st.dataframe(df_ozet, use_container_width=True, hide_index=True)
+
+                        # En sorunlu makine
+                        en_kotu = df_ozet.iloc[0]
+                        st.info(f"⚠️ En fazla arıza: **{en_kotu['Makine']}** — {en_kotu['Arıza Sayısı']} arıza | MTTR: {en_kotu['MTTR (dk)']} dk")
+                    else:
+                        st.caption("Kapatılmış arıza verisi bulunamadı.")
+                else:
+                    st.caption("MTTR/MTBF için kapatılmış arıza kaydı gerekli.")
+            except Exception as e:
+                st.caption(f"MTTR/MTBF hesaplanamadı: {e}")
+
             if len(g)>0 and "Talep No" in g.columns:
                 with st.expander("📄 Talep Detay"):
                     sn = st.selectbox("Talep seçin", g["Talep No"].tolist())
@@ -1273,6 +1318,37 @@ with tab_rapor:
                         with col_d2:
                             for a in alanlar[yari:]:
                                 if str(s[a]) not in ["","nan","0","0.0"]: st.markdown(f"**{a}:** {s[a]}")
+
+                        # Talep detayında o makineye ait MTTR/MTBF
+                        st.markdown("---")
+                        st.markdown(f"##### 📐 {s.get('Makine','—')} — MTTR & MTBF")
+                        try:
+                            df_mak = df_r[
+                                (df_r["Makine"] == s.get("Makine","")) &
+                                (df_r["Durum"]  == "Kapalı")
+                            ].copy()
+                            if not df_mak.empty and "Çözüm Süresi (Dk)" in df_mak.columns:
+                                df_mak["sure"] = pd.to_numeric(df_mak["Çözüm Süresi (Dk)"], errors="coerce")
+                                df_mak = df_mak.dropna(subset=["sure"])
+                                mttr_d = round(df_mak["sure"].mean(), 1)
+                                toplam_d = len(df_mak)
+                                mtbf_d = avail_d = None
+                                if toplam_d >= 2 and "Kapatma Tarihi" in df_mak.columns:
+                                    df_mak["kap"] = pd.to_datetime(df_mak["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce")
+                                    df_mak = df_mak.dropna(subset=["kap"]).sort_values("kap")
+                                    fark = df_mak["kap"].diff().dropna()
+                                    if len(fark) > 0:
+                                        mtbf_d  = round(fark.dt.total_seconds().mean() / 60, 1)
+                                        avail_d = round(mtbf_d / (mtbf_d + mttr_d) * 100, 1)
+                                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                                with col_m1: st.metric("⏱ MTTR",     f"{mttr_d} dk")
+                                with col_m2: st.metric("🔄 MTBF",     f"{mtbf_d} dk" if mtbf_d else "—")
+                                with col_m3: st.metric("📊 Arıza",    f"{toplam_d} adet")
+                                with col_m4: st.metric("📈 Avail.",   f"%{avail_d}" if avail_d else "—")
+                            else:
+                                st.caption("Bu makine için henüz yeterli kapatılmış arıza yok.")
+                        except Exception as e:
+                            st.caption(f"Hesaplanamadı: {e}")
 
 # =============================================================================
 # SEKME 5: STOK YÖNETİMİ

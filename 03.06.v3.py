@@ -290,7 +290,6 @@ def kullanicilar_getir() -> dict:
     except Exception:
         return {}
 
-@st.cache_data(ttl=60)
 def makine_listesi_db() -> dict:
     try:
         rows = sb_select("makine_listesi", "aktif=eq.true")
@@ -303,15 +302,21 @@ def makine_listesi_db() -> dict:
     except Exception:
         return {}
 
-@st.cache_data(ttl=60)
 def ariza_turu_db() -> dict:
     try:
-        rows = sb_select("ariza_turu_listesi", "aktif=eq.true")
+        url = f"{sb_url()}/rest/v1/ariza_turu_listesi?aktif=eq.true&order=kategori.asc,id.asc"
+        r = requests.get(url, headers=sb_headers(), timeout=10)
+        if not r.ok:
+            return {}
+        rows = r.json()
         if not rows:
             return {}
         result = {}
-        for r in rows:
-            result.setdefault(r["kategori"], []).append(r["alt_tur"])
+        for row in rows:
+            kat = row.get("kategori", "")
+            alt = row.get("alt_tur", "")
+            if kat and alt:
+                result.setdefault(kat, []).append(alt)
         return result
     except Exception:
         return {}
@@ -350,8 +355,6 @@ def cache_temizle():
     ariza_df_getir.clear()
     stok_df_getir.clear()
     kullanicilar_getir.clear()
-    makine_listesi_db.clear()
-    ariza_turu_db.clear()
 
 @st.cache_data(ttl=3600)
 def veritabani_hazirla():

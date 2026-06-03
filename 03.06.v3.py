@@ -838,6 +838,15 @@ with tab_yeni:
     # Bölge seçimi form dışında — makine listesini dinamik günceller
     secili_bolge = st.selectbox("🏭 Tesis / Bölge *", BOLGELER)
 
+    # Arıza kategorisi ve alt kategori form dışında — birbirine bağlı dinamik güncellenir
+    ariza_liste  = aktif_ariza_turleri()
+    col_dyn1, col_dyn2 = st.columns(2)
+    with col_dyn1:
+        ariza_tur    = st.selectbox("Arıza Kategorisi *", list(ariza_liste.keys()))
+    with col_dyn2:
+        alt_tur_listesi = ariza_liste.get(ariza_tur, ["Diğer"])
+        alt_kategori = st.selectbox("Alt Kategori *", alt_tur_listesi)
+
     with st.form("yeni_talep_formu", clear_on_submit=True):
         st.markdown("#### 👤 Bildiren Personel")
         col_b1,col_b2,col_b3 = st.columns(3)
@@ -851,15 +860,21 @@ with tab_yeni:
         st.markdown(f"#### 🏭 Arıza Lokasyonu — {secili_bolge}")
         col_m1,col_m2 = st.columns(2)
         mak_liste = aktif_makine_listesi().get(secili_bolge, MAKINE_LISTESI_BOLGE[secili_bolge])
-        ariza_liste = aktif_ariza_turleri()
         with col_m1:
-            makine    = st.selectbox("Makine / Sistem *", mak_liste)
-            ariza_tur = st.selectbox("Arıza Kategorisi *", list(ariza_liste.keys()))
+            makine = st.selectbox("Makine / Sistem *", mak_liste)
+            st.markdown(f"""<div style="background:rgba(30,41,59,0.5);border:1px solid rgba(99,179,237,0.15);
+                border-radius:8px;padding:10px 14px;font-size:13px;">
+                <span style="color:#64748b;">Kategori:</span>
+                <strong style="color:#e2e8f0;margin-left:6px;">{ariza_tur}</strong><br>
+                <span style="color:#64748b;">Alt Tür:</span>
+                <strong style="color:#93c5fd;margin-left:6px;">{alt_kategori}</strong>
+                </div>""", unsafe_allow_html=True)
         with col_m2:
-            oncelik      = st.selectbox("Kritiklik Seviyesi (SLA) *", list(ARIZA_ONCELIKLERI.keys()))
-            bildirim_saat= st.text_input("Arıza Fark Edilme Saati", value=st.session_state.get("bil_saat", datetime.now().strftime("%H:%M")), help="SS:DD formatında")
+            oncelik       = st.selectbox("Kritiklik Seviyesi (SLA) *", list(ARIZA_ONCELIKLERI.keys()))
+            bildirim_saat = st.text_input("Arıza Fark Edilme Saati",
+                value=st.session_state.get("bil_saat", datetime.now().strftime("%H:%M")),
+                help="SS:DD formatında")
 
-        alt_kategori = st.selectbox("Alt Kategori", ariza_liste.get(ariza_tur, ["Diğer"]))
         ariza_tanimi = st.text_area("Arıza Tanımı *", placeholder="Arızanın belirti ve etkilerini açıklayın...", height=100)
         foto_notu    = st.text_input("Fotoğraf / Referans Notu", placeholder="Opsiyonel")
 

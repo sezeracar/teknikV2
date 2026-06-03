@@ -1718,7 +1718,7 @@ def bakim_durumu_guncelle():
         pass
 
 with tab_bakim:
-    if not giris_gerektir("Teknisyen"):
+    if not giris_gerektir("Yönetici"):
         pass
     else:
         st.markdown("### 🔧 Periyodik Bakım Planları")

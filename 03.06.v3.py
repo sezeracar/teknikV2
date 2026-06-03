@@ -615,9 +615,10 @@ st.markdown("""
   <p style="color:#475569;font-size:13px;margin-top:4px;">Computerized Maintenance Management System — Endüstriyel TPM Platformu</p>
 </div>""", unsafe_allow_html=True)
 
-tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_ayar = st.tabs([
+tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_oee, tab_ayar = st.tabs([
     "📊 Canlı Pano","➕ Yeni Talep Aç","✅ Talep Kapat",
-    "📋 Raporlama & Arşiv","📦 Stok Yönetimi","🔧 Bakım Planları","⚙️ Sistem Ayarları"
+    "📋 Raporlama & Arşiv","📦 Stok Yönetimi","🔧 Bakım Planları",
+    "📈 OEE Analizi","⚙️ Sistem Ayarları"
 ])
 
 # =============================================================================
@@ -730,6 +731,41 @@ with tab_pano:
                 st.caption("Henüz bakım planı eklenmemiş.")
         except Exception:
             st.caption("Bakım verileri yüklenemedi.")
+
+        # ── OEE Özet ─────────────────────────────────────────────────
+        st.markdown("---")
+        st.markdown("#### 📈 OEE Durumu — Son 7 Gün")
+        try:
+            df_oee_p = oee_df_getir()
+            if not df_oee_p.empty and "tarih" in df_oee_p.columns:
+                df_oee_p["_t"] = pd.to_datetime(df_oee_p["tarih"], format="%d/%m/%Y", errors="coerce").dt.date
+                son7 = df_oee_p[df_oee_p["_t"] >= date.today() - timedelta(days=7)]
+                if not son7.empty:
+                    col_oee1, col_oee2, col_oee3 = st.columns(3)
+                    # Genel OEE
+                    son7 = son7.copy()
+                    son7["oee_v"] = (
+                        (son7["planlanan_sure_dk"]-son7["duraklamalar_dk"]) /
+                        son7["planlanan_sure_dk"].replace(0,1) *
+                        son7["uretilen_adet"] / son7["hedef_adet"].replace(0,1) *
+                        (son7["uretilen_adet"]-son7["hurdalar_adet"]) /
+                        son7["uretilen_adet"].replace(0,1) * 100
+                    ).clip(0,100).round(1)
+                    genel = round(son7["oee_v"].mean(), 1)
+                    en_iyi  = son7.groupby("makine")["oee_v"].mean().idxmax()
+                    en_kotu = son7.groupby("makine")["oee_v"].mean().idxmin()
+                    with col_oee1: st.metric("📈 Ort. OEE (7 gün)", f"%{genel}",
+                        delta="🏆 Hedef üstü" if genel>=85 else "⚠️ Hedefin altında")
+                    with col_oee2: st.metric("🟢 En İyi Makine", en_iyi,
+                        delta=f"%{round(son7[son7['makine']==en_iyi]['oee_v'].mean(),1)}")
+                    with col_oee3: st.metric("🔴 En Düşük Makine", en_kotu,
+                        delta=f"%{round(son7[son7['makine']==en_kotu]['oee_v'].mean(),1)}")
+                else:
+                    st.caption("Son 7 günde OEE verisi yok. OEE sekmesinden veri girin.")
+            else:
+                st.caption("OEE verisi henüz girilmemiş.")
+        except Exception:
+            st.caption("OEE verileri yüklenemedi.")
 
 # =============================================================================
 # SEKME 2: YENİ TALEP AÇ
@@ -2031,6 +2067,239 @@ with tab_bakim:
                 st.caption(f"Takvim yüklenemedi: {e}")
         else:
             st.info("Bakım planı bulunmuyor.")
+
+# =============================================================================
+# SEKME: OEE ANALİZİ
+# =============================================================================
+
+@st.cache_data(ttl=30)
+def oee_df_getir() -> pd.DataFrame:
+    try:
+        rows = sb_select("oee_kayit")
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows)
+        df = df.drop(columns=[c for c in ["created_at"] if c in df.columns])
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+def oee_hesapla(planlanan, duraklamalar, uretilen, hedef, hurda):
+    """OEE = Availability × Performance × Quality"""
+    try:
+        calisma = planlanan - duraklamalar
+        availability  = round(calisma / planlanan * 100, 1) if planlanan > 0 else 0
+        performance   = round(uretilen / hedef * 100, 1) if hedef > 0 else 0
+        quality       = round((uretilen - hurda) / uretilen * 100, 1) if uretilen > 0 else 0
+        oee           = round(availability * performance * quality / 10000, 1)
+        return {
+            "availability":  min(availability, 100),
+            "performance":   min(performance, 100),
+            "quality":       min(quality, 100),
+            "oee":           min(oee, 100),
+        }
+    except:
+        return {"availability": 0, "performance": 0, "quality": 0, "oee": 0}
+
+def oee_renk(deger):
+    if deger >= 85:   return "#16A34A"  # Yeşil — Dünya standardı
+    elif deger >= 65: return "#D97706"  # Sarı  — Geliştirilmeli
+    else:             return "#DC2626"  # Kırmızı — Kritik
+
+with tab_oee:
+    if not giris_gerektir("Yönetici"):
+        pass
+    else:
+        st.markdown("### 📈 OEE — Overall Equipment Effectiveness")
+        st.caption("Dünya standardı: OEE ≥ %85 | Availability ≥ %90 | Performance ≥ %95 | Quality ≥ %99")
+
+        df_oee = oee_df_getir()
+
+        # ── OEE Veri Girişi ───────────────────────────────────────────
+        col_giris, col_liste = st.columns([2, 3])
+
+        with col_giris:
+            st.markdown("#### ➕ Günlük OEE Verisi Gir")
+            with st.form("oee_giris"):
+                col_o1, col_o2 = st.columns(2)
+                with col_o1:
+                    o_bolge   = st.selectbox("Bölge *", BOLGELER, key="o_bolge")
+                    o_makine  = st.selectbox("Makine *",
+                        aktif_makine_listesi().get(o_bolge, MAKINE_LISTESI_BOLGE[o_bolge]),
+                        key="o_makine")
+                    o_tarih   = st.date_input("Tarih *", value=date.today(), key="o_tarih")
+                with col_o2:
+                    o_planlanan  = st.number_input("Planlanan Çalışma (dk) *",
+                        min_value=1, step=30, value=480,
+                        help="Vardiya süresi, örn: 480 dk = 8 saat")
+                    o_duraklamalar = st.number_input("Toplam Duraklamalar (dk) *",
+                        min_value=0, step=5, value=0,
+                        help="Arıza + bakım + setup + bekleme süreleri toplamı")
+                    o_hedef      = st.number_input("Hedef Üretim (adet) *",
+                        min_value=1, step=10, value=100,
+                        help="Teorik maksimum kapasite")
+
+                col_o3, col_o4 = st.columns(2)
+                with col_o3:
+                    o_uretilen = st.number_input("Gerçekleşen Üretim (adet) *",
+                        min_value=0, step=10, value=0)
+                with col_o4:
+                    o_hurda    = st.number_input("Hurda / Red Adet",
+                        min_value=0, step=1, value=0)
+                o_notlar = st.text_input("Notlar", placeholder="Duraklamaların nedeni vb.")
+
+                # Anlık önizleme
+                if o_planlanan > 0:
+                    onizleme = oee_hesapla(o_planlanan, o_duraklamalar, o_uretilen, o_hedef, o_hurda)
+                    st.markdown(f"""
+                    <div style="background:rgba(30,41,59,0.6);border:1px solid rgba(99,179,237,0.15);
+                                border-radius:8px;padding:12px;margin:8px 0;font-size:12px;">
+                      <strong style="color:#93c5fd;">Önizleme:</strong>
+                      <span style="color:{oee_renk(onizleme['availability'])};margin-left:8px;">
+                        A: %{onizleme['availability']}</span>
+                      <span style="color:{oee_renk(onizleme['performance'])};margin-left:8px;">
+                        P: %{onizleme['performance']}</span>
+                      <span style="color:{oee_renk(onizleme['quality'])};margin-left:8px;">
+                        Q: %{onizleme['quality']}</span>
+                      <span style="color:{oee_renk(onizleme['oee'])};margin-left:12px;font-size:15px;font-weight:700;">
+                        OEE: %{onizleme['oee']}</span>
+                    </div>""", unsafe_allow_html=True)
+
+                submit_oee = st.form_submit_button("💾 OEE Kaydını Ekle", use_container_width=True)
+                if submit_oee:
+                    h = oee_hesapla(o_planlanan, o_duraklamalar, o_uretilen, o_hedef, o_hurda)
+                    ok = sb_insert("oee_kayit", {
+                        "bolge":           o_bolge,
+                        "makine":          o_makine,
+                        "tarih":           o_tarih.strftime("%d/%m/%Y"),
+                        "planlanan_sure_dk":  int(o_planlanan),
+                        "duraklamalar_dk":    int(o_duraklamalar),
+                        "uretilen_adet":      int(o_uretilen),
+                        "hedef_adet":         int(o_hedef),
+                        "hurdalar_adet":      int(o_hurda),
+                        "notlar":          o_notlar,
+                        "olusturan":       st.session_state.get("aktif_tam_ad",""),
+                        "olusturma_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    })
+                    if ok:
+                        oee_df_getir.clear()
+                        log_yaz("OEE GİRİŞİ", f"{o_bolge} — {o_makine} — {o_tarih} — OEE:%{h['oee']}")
+                        st.success(f"✅ Kaydedildi! OEE: **%{h['oee']}**")
+                        time.sleep(0.5)
+                        st.rerun()
+                    else:
+                        st.error("❌ Kaydedilemedi.")
+
+        with col_liste:
+            st.markdown("#### 📊 OEE Özet — Makine Bazlı")
+
+            if df_oee.empty:
+                st.info("Henüz OEE verisi girilmemiş.")
+            else:
+                # Filtreler
+                col_fl1, col_fl2 = st.columns(2)
+                with col_fl1:
+                    fl_oee_bolge  = st.selectbox("Bölge", ["Tümü"]+BOLGELER, key="oee_fl_bolge")
+                with col_fl2:
+                    fl_oee_makine = st.selectbox("Makine", ["Tümü"]+sorted(df_oee["makine"].unique().tolist()), key="oee_fl_makine")
+
+                df_f = df_oee.copy()
+                if fl_oee_bolge  != "Tümü": df_f = df_f[df_f["bolge"]  == fl_oee_bolge]
+                if fl_oee_makine != "Tümü": df_f = df_f[df_f["makine"] == fl_oee_makine]
+
+                if df_f.empty:
+                    st.info("Filtreye uyan veri yok.")
+                else:
+                    # Makine bazlı ortalama hesapla
+                    ozet = []
+                    for mak, grp in df_f.groupby("makine"):
+                        ort_a = round(
+                            ((grp["planlanan_sure_dk"] - grp["duraklamalar_dk"]) /
+                             grp["planlanan_sure_dk"].replace(0,1) * 100).mean(), 1)
+                        ort_p = round(
+                            (grp["uretilen_adet"] / grp["hedef_adet"].replace(0,1) * 100).mean(), 1)
+                        ort_q = round(
+                            ((grp["uretilen_adet"] - grp["hurdalar_adet"]) /
+                             grp["uretilen_adet"].replace(0,1) * 100).mean(), 1)
+                        ort_oee = round(ort_a * ort_p * ort_q / 10000, 1)
+                        ozet.append({
+                            "Makine":          mak,
+                            "Kayıt Sayısı":    len(grp),
+                            "Ort. A (%)":      min(ort_a,100),
+                            "Ort. P (%)":      min(ort_p,100),
+                            "Ort. Q (%)":      min(ort_q,100),
+                            "Ort. OEE (%)":    min(ort_oee,100),
+                            "Durum":           "🟢 İyi" if ort_oee>=85 else "🟡 Geliştirilmeli" if ort_oee>=65 else "🔴 Kritik"
+                        })
+
+                    df_ozet = pd.DataFrame(ozet).sort_values("Ort. OEE (%)", ascending=False)
+                    st.dataframe(df_ozet, use_container_width=True, hide_index=True)
+
+                    # Genel OEE kartı
+                    genel_oee = round(df_ozet["Ort. OEE (%)"].mean(), 1)
+                    renk_g    = oee_renk(genel_oee)
+                    st.markdown(f"""
+                    <div style="background:rgba(30,41,59,0.7);border:1px solid {renk_g}44;
+                                border-left:4px solid {renk_g};border-radius:10px;
+                                padding:16px 20px;margin-top:12px;display:flex;
+                                justify-content:space-between;align-items:center;">
+                      <div>
+                        <div style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">
+                          GENEL OEE ORTALAMASI
+                        </div>
+                        <div style="font-size:36px;font-weight:800;color:{renk_g};margin-top:4px;">
+                          %{genel_oee}
+                        </div>
+                      </div>
+                      <div style="text-align:right;font-size:12px;color:#64748b;">
+                        Dünya Std: %85<br>
+                        {"🏆 Dünya Standardında!" if genel_oee>=85
+                         else "⚠️ Geliştirilmeli" if genel_oee>=65
+                         else "🚨 Acil İyileştirme Gerekli"}
+                      </div>
+                    </div>""", unsafe_allow_html=True)
+
+        # ── Trend Grafiği ──────────────────────────────────────────────
+        st.markdown("---")
+        st.markdown("#### 📉 OEE Trend Grafiği")
+        if not df_oee.empty:
+            try:
+                df_trend_oee = df_oee.copy()
+                df_trend_oee["_tarih"] = pd.to_datetime(
+                    df_trend_oee["tarih"], format="%d/%m/%Y", errors="coerce")
+                df_trend_oee = df_trend_oee.dropna(subset=["_tarih"]).sort_values("_tarih")
+                df_trend_oee["oee_val"] = (
+                    (df_trend_oee["planlanan_sure_dk"] - df_trend_oee["duraklamalar_dk"]) /
+                    df_trend_oee["planlanan_sure_dk"].replace(0,1) *
+                    df_trend_oee["uretilen_adet"] / df_trend_oee["hedef_adet"].replace(0,1) *
+                    (df_trend_oee["uretilen_adet"] - df_trend_oee["hurdalar_adet"]) /
+                    df_trend_oee["uretilen_adet"].replace(0,1) * 100
+                ).clip(0, 100).round(1)
+
+                # Makine bazlı pivot
+                pivot = df_trend_oee.groupby(["_tarih","makine"])["oee_val"].mean().unstack(fill_value=None)
+                if not pivot.empty:
+                    st.line_chart(pivot, height=280)
+                    st.caption("Her renk bir makineyi temsil eder. Hedef çizgisi: %85")
+            except Exception as e:
+                st.caption(f"Trend grafiği yüklenemedi: {e}")
+
+        # ── Detay Tablosu ──────────────────────────────────────────────
+        st.markdown("---")
+        with st.expander("🔍 Tüm OEE Kayıtları"):
+            if not df_oee.empty:
+                df_goster = df_oee.rename(columns={
+                    "bolge":"Bölge","makine":"Makine","tarih":"Tarih",
+                    "planlanan_sure_dk":"Plan (dk)","duraklamalar_dk":"Duraklamalar (dk)",
+                    "uretilen_adet":"Üretilen","hedef_adet":"Hedef",
+                    "hurdalar_adet":"Hurda","notlar":"Notlar","olusturan":"Giren"
+                })
+                st.dataframe(df_goster, use_container_width=True, hide_index=True)
+                st.download_button("📥 OEE Verisini İndir",
+                    df_goster.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+                    file_name=f"oee_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
+            else:
+                st.info("Veri yok.")
 
 # =============================================================================
 # FOOTER

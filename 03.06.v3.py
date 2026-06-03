@@ -399,6 +399,58 @@ def log_yaz(islem: str, detay: str = ""):
         "detay":    detay
     })
 
+def email_gonder(konu: str, icerik: str) -> bool:
+    """Gmail ile bildirim emaili gönder. Secrets yoksa sessizce geç."""
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        gonderici = st.secrets["email"]["gonderici"]
+        sifre     = st.secrets["email"]["sifre"]
+        alici_str = st.secrets["email"]["alici"]
+        alicilar  = [a.strip() for a in alici_str.split(",") if a.strip()]
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"[TeknikPro CMMS] {konu}"
+        msg["From"]    = f"TeknikPro CMMS <{gonderici}>"
+        msg["To"]      = ", ".join(alicilar)
+
+        # HTML içerik
+        html = f"""
+        <html><body style="font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;">
+          <div style="max-width:600px;margin:0 auto;background:#1e293b;border-radius:12px;padding:24px;
+                      border-left:4px solid #3b82f6;">
+            <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">
+              TeknikPro CMMS — Otomatik Bildirim
+            </div>
+            <h2 style="color:#e2e8f0;margin:0 0 16px 0;">{konu}</h2>
+            <div style="background:#0f172a;border-radius:8px;padding:16px;font-size:14px;
+                        line-height:1.8;color:#cbd5e1;white-space:pre-line;">
+{icerik}
+            </div>
+            <div style="margin-top:20px;font-size:11px;color:#475569;border-top:1px solid #334155;padding-top:12px;">
+              {datetime.now().strftime("%d/%m/%Y %H:%M")} — Adana LM / Tuzla LM
+            </div>
+          </div>
+        </body></html>
+        """
+
+        msg.attach(MIMEText(html, "html", "utf-8"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gonderici, sifre)
+            server.sendmail(gonderici, alicilar, msg.as_string())
+        return True
+
+    except KeyError:
+        # Secrets tanımlı değil — sessizce geç
+        return False
+    except Exception as e:
+        # Email gönderilemedi — sistemi bloklama
+        print(f"Email gönderilemedi: {e}")
+        return False
+
 def sla_hesapla(oncelik: str, acilis: str, kapanis: str = None) -> dict:
     sla_dk = ARIZA_ONCELIKLERI.get(oncelik, {}).get("sla_dk", 480)
     try:
@@ -845,6 +897,24 @@ with tab_yeni:
                     cache_temizle()
                     st.session_state["_talep_gonderildi"] = True
                     log_yaz("YENİ TALEP", f"{no} — {secili_bolge} — {makine} — {bildiren}")
+
+                    # Kritik veya Yüksek arızada email gönder
+                    if "KRİTİK" in oncelik or "YÜKSEK" in oncelik:
+                        email_gonder(
+                            f"🚨 {oncelik[:10]} Arıza — {makine} ({secili_bolge})",
+                            f"""Talep No   : {no}
+Bölge      : {secili_bolge}
+Makine     : {makine}
+Öncelik    : {oncelik}
+Arıza Türü : {ariza_tur} → {alt_kategori}
+Tanım      : {ariza_tanimi.strip()}
+Bildiren   : {bildiren.strip()} ({bildiren_dept})
+Vardiya    : {vardiya}
+Açılış     : {datetime.now().strftime("%d/%m/%Y %H:%M")}
+SLA Hedefi : {sla_bilgi["sla_dk"]} dakika
+
+→ Sisteme giriş: {sb_url().replace("/rest/v1","") if sb_url() else ""}"""
+                        )
                     st.success(f"✅ Talep **{no}** oluşturuldu! Bölge: {secili_bolge} | SLA: {sla_bilgi['sla_dk']} dk")
                     time.sleep(1)
                     st.rerun()
@@ -1222,6 +1292,21 @@ with tab_kapat:
                                 })
                                 cache_temizle()
                                 log_yaz("TALEP KAPATILDI", f"{secilen_no} — {mudahale_eden} — {cozum_dk} dk — {toplam_maliyet:.0f} TL")
+
+                                # Kapatma bildirimi — sadece Kritik ve Yüksek arızalarda
+                                if "KRİTİK" in str(talep.get("Öncelik","")) or "YÜKSEK" in str(talep.get("Öncelik","")):
+                                    email_gonder(
+                                        f"✅ Talep Kapatıldı — {talep.get('Makine','')} ({talep.get('Bölge','')})",
+                                        f"""Talep No     : {secilen_no}
+Makine       : {talep.get("Makine","")}
+Bölge        : {talep.get("Bölge","")}
+Müdahale Eden: {mudahale_eden}
+Çözüm Süresi : {cozum_dk} dakika ({mud_bas} - {mud_bit})
+SLA Durumu   : {sla_s["durum"]}
+Toplam Maliyet: {toplam_maliyet:,.0f} TL
+Kök Neden    : {kok_neden}
+Çözüm        : {cozum_aciklama.strip()[:200]}"""
+                                    )
                                 st.success(f"✅ Talep **{secilen_no}** kapatıldı! Süre: {cozum_dk} dk | Toplam: {toplam_maliyet:,.0f} TL | {sla_s['durum']}")
                                 time.sleep(1.5)
                                 st.rerun()
@@ -1439,6 +1524,25 @@ with tab_stok:
                         sb_update("stok",f"malzeme_adi=eq.{secilen_mal}",{"stok_miktari":int(yeni_m),"son_guncelleme":datetime.now().strftime("%d/%m/%Y")})
                         cache_temizle()
                         log_yaz("STOK GÜNCELLEME",f"{secilen_mal} {mev}→{yeni_m}")
+
+                        # Kritik seviyeye düştüyse email gönder
+                        try:
+                            ds_check = stok_df_getir()
+                            satir = ds_check[ds_check["Malzeme Adı"]==secilen_mal]
+                            if not satir.empty:
+                                krit_sev = int(satir["Kritik Seviye"].values[0])
+                                if yeni_m <= krit_sev:
+                                    email_gonder(
+                                        f"⚠️ Kritik Stok Uyarısı — {secilen_mal}",
+                                        f"""Malzeme    : {secilen_mal}
+Mevcut Stok: {yeni_m} {satir["Birim"].values[0] if "Birim" in satir.columns else "adet"}
+Kritik Sev.: {krit_sev}
+Tedarikçi  : {satir["Tedarikçi"].values[0] if "Tedarikçi" in satir.columns else "—"}
+
+⚠️ Stok kritik seviyenin altına düştü. Acil sipariş gerekli!"""
+                                    )
+                        except Exception:
+                            pass
                         st.success(f"✅ {secilen_mal}: {mev} → **{yeni_m}**")
                         time.sleep(1); st.rerun()
 
@@ -1670,6 +1774,38 @@ with tab_ayar:
                     st.info("Henüz log kaydı yok.")
             except Exception as e:
                 st.info(f"Log yüklenemedi: {e}")
+
+            st.markdown("---")
+            st.markdown("#### 📧 Email Bildirim Ayarları")
+            try:
+                gonderici = st.secrets["email"]["gonderici"]
+                alici     = st.secrets["email"]["alici"]
+                st.success(f"✅ Email yapılandırıldı: **{gonderici}** → **{alici}**")
+                st.caption("Bildirimler: 🔴 Kritik/Yüksek arıza açıldığında | ✅ Kapatıldığında | ⚠️ Kritik stok")
+                if st.button("📧 Test Emaili Gönder", use_container_width=False):
+                    ok = email_gonder(
+                        "🧪 Test Bildirimi — TeknikPro CMMS",
+                        f"""Bu bir test mesajıdır.
+
+Sistem     : TeknikPro CMMS v2.0
+Tesis      : Adana LM / Tuzla LM
+Tarih      : {datetime.now().strftime("%d/%m/%Y %H:%M")}
+
+✅ Email bildirimleri başarıyla yapılandırıldı!"""
+                    )
+                    if ok:
+                        st.success("✅ Test emaili gönderildi!")
+                    else:
+                        st.error("❌ Email gönderilemedi. Gmail şifrenizi kontrol edin.")
+            except KeyError:
+                st.warning("⚠️ Email henüz yapılandırılmamış.")
+                st.caption("""Secrets'a ekleyin:
+```toml
+[email]
+gonderici = "sizin@gmail.com"
+sifre = "uygulama-sifresi"
+alici = "alici@gmail.com"
+```""")
 
             st.markdown("---")
             st.markdown("#### 🗄️ Veri Yedekleme")

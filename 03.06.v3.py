@@ -899,7 +899,68 @@ with tab_kapat:
 
                     ISCI_UCRET = 300  # TL/saat
 
-                    # ── Periyodik bakımsa checklist göster ────────────
+                    # ── MTTR / MTBF Analizi ───────────────────────────
+                    try:
+                        df_all = ariza_df_getir()
+                        makine_adi_mttr = talep.get("Makine", "")
+                        if not df_all.empty and "Durum" in df_all.columns and makine_adi_mttr:
+                            df_makine = df_all[
+                                (df_all["Makine"] == makine_adi_mttr) &
+                                (df_all["Durum"]  == "Kapalı")
+                            ].copy()
+
+                            if not df_makine.empty and "Çözüm Süresi (Dk)" in df_makine.columns:
+                                df_makine["sure"] = pd.to_numeric(df_makine["Çözüm Süresi (Dk)"], errors="coerce")
+                                df_makine = df_makine.dropna(subset=["sure"])
+
+                                if not df_makine.empty:
+                                    mttr = round(df_makine["sure"].mean(), 1)
+                                    toplam_ariza = len(df_makine)
+
+                                    # MTBF: kapatma tarihleri arasındaki ortalama süre
+                                    mtbf_dk   = None
+                                    avail_oran = None
+                                    if "Kapatma Tarihi" in df_makine.columns and len(df_makine) >= 2:
+                                        df_makine["kap"] = pd.to_datetime(
+                                            df_makine["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce"
+                                        )
+                                        df_makine = df_makine.dropna(subset=["kap"]).sort_values("kap")
+                                        farklar = df_makine["kap"].diff().dropna()
+                                        if len(farklar) > 0:
+                                            mtbf_dk    = round(farklar.dt.total_seconds().mean() / 60, 1)
+                                            avail_oran = round(mtbf_dk / (mtbf_dk + mttr) * 100, 1)
+
+                                    # Göster
+                                    col_mt1, col_mt2, col_mt3, col_mt4 = st.columns(4)
+                                    with col_mt1:
+                                        st.metric("⏱ MTTR", f"{mttr} dk",
+                                            help="Mean Time To Repair — Bu makine için ortalama tamir süresi")
+                                    with col_mt2:
+                                        st.metric("🔄 MTBF",
+                                            f"{mtbf_dk} dk" if mtbf_dk else "Yetersiz veri",
+                                            help="Mean Time Between Failures — Arızalar arası ortalama süre")
+                                    with col_mt3:
+                                        st.metric("📊 Toplam Arıza", f"{toplam_ariza} adet",
+                                            help="Bu makine için kapatılmış toplam arıza")
+                                    with col_mt4:
+                                        if avail_oran:
+                                            renk = "#4ade80" if avail_oran >= 85 else "#fbbf24" if avail_oran >= 70 else "#f87171"
+                                            st.markdown(f"""
+                                            <div style="background:rgba(30,41,59,0.8);border:1px solid rgba(99,179,237,0.18);
+                                                        border-radius:12px;padding:16px 20px;">
+                                              <div style="font-size:12px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">
+                                                📈 AVAILABILITY
+                                              </div>
+                                              <div style="font-size:28px;font-weight:700;color:{renk};margin-top:4px;">
+                                                %{avail_oran}
+                                              </div>
+                                            </div>""", unsafe_allow_html=True)
+                                        else:
+                                            st.metric("📈 Availability", "—")
+                    except Exception:
+                        pass
+
+                    st.markdown("---")
                     tum_tamam = True
                     if "Periyodik Bakım" in str(talep.get("Arıza Tanımı", "")):
                         st.markdown("#### ☑️ Bakım Kontrol Listesi")

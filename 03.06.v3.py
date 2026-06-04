@@ -1546,29 +1546,75 @@ with tab_kapat:
                             st.caption(f"Checklist yüklenemedi: {e}")
 
                     with st.form("kapat_formu"):
+                        st.markdown("##### 👤 Teknisyen & Zaman")
                         col_k1,col_k2,col_k3 = st.columns(3)
                         with col_k1:
-                            mudahale_eden = st.text_input("Müdahale Eden Teknisyen *", value=st.session_state.get("aktif_tam_ad",""))
+                            mudahale_eden = st.text_input("Müdahale Eden Teknisyen *",
+                                value=st.session_state.get("aktif_tam_ad",""))
                         with col_k2:
-                            mud_bas = st.text_input("🕐 Başlama Saati *", value=datetime.now().strftime("%H:%M"), help="SS:DD")
+                            mud_bas_time = st.time_input("🕐 Müdahaleye Başlama",
+                                value=datetime.now().time(),
+                                help="Teknisyenin müdahaleye başladığı saat")
                         with col_k3:
-                            mud_bit = st.text_input("🕑 Bitiş Saati *", value=datetime.now().strftime("%H:%M"), help="SS:DD")
+                            mud_bit_time = st.time_input("🕑 Arıza Giderilme",
+                                value=datetime.now().time(),
+                                help="Arızanın giderildiği saat")
 
+                        # Otomatik süre hesapla
                         try:
-                            bd = datetime.strptime(date.today().strftime("%d/%m/%Y")+" "+mud_bas.strip(), "%d/%m/%Y %H:%M")
-                            btt= datetime.strptime(date.today().strftime("%d/%m/%Y")+" "+mud_bit.strip(), "%d/%m/%Y %H:%M")
-                            if btt < bd: btt += timedelta(days=1)
-                            cozum_dk = max(1, int((btt-bd).total_seconds()/60))
+                            bugun = date.today()
+                            bd  = datetime.combine(bugun, mud_bas_time)
+                            btt = datetime.combine(bugun, mud_bit_time)
+                            if btt <= bd:
+                                btt += timedelta(days=1)  # gece yarısı geçişi
+                            cozum_dk = max(1, int((btt - bd).total_seconds() / 60))
                             parse_ok = True
                         except:
                             cozum_dk = 1
                             parse_ok = False
 
-                        isguc = round((cozum_dk/60)*ISCI_UCRET, 2)
-                        if parse_ok:
-                            st.info(f"⏱ Çözüm Süresi: **{cozum_dk} dk** ({cozum_dk//60}s {cozum_dk%60}dk)  |  💰 İş Gücü: **{isguc:,.0f} TL** (300 TL/saat)")
-                        else:
-                            st.warning("⚠️ Saat formatı hatalı. SS:DD formatında girin.")
+                        # Arıza açılışından bu yana geçen süre
+                        try:
+                            acilis_dt = datetime.strptime(talep["Açılış Tarihi"], "%d/%m/%Y %H:%M")
+                            toplam_dk = int((datetime.now() - acilis_dt).total_seconds() / 60)
+                            bekleme_dk = max(0, toplam_dk - cozum_dk)
+                        except:
+                            toplam_dk = 0
+                            bekleme_dk = 0
+
+                        isguc = round((cozum_dk / 60) * ISCI_UCRET, 2)
+
+                        # Süre özet kartı
+                        st.markdown(f"""
+                        <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
+                                    border-radius:10px;padding:12px 16px;margin:8px 0;">
+                          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center;">
+                            <div>
+                              <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">Müdahale Süresi</div>
+                              <div style="font-size:20px;font-weight:800;color:#FFD700;">{cozum_dk} dk</div>
+                              <div style="font-size:10px;color:#9B6FBF;">{cozum_dk//60}s {cozum_dk%60}dk</div>
+                            </div>
+                            <div>
+                              <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">Bekleme Süresi</div>
+                              <div style="font-size:20px;font-weight:800;color:#C89EE8;">{bekleme_dk} dk</div>
+                              <div style="font-size:10px;color:#9B6FBF;">Açılıştan müdahaleye</div>
+                            </div>
+                            <div>
+                              <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">Toplam Süre</div>
+                              <div style="font-size:20px;font-weight:800;color:#E8D5FF;">{toplam_dk} dk</div>
+                              <div style="font-size:10px;color:#9B6FBF;">Açılıştan kapanışa</div>
+                            </div>
+                            <div>
+                              <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">İş Gücü Maliyeti</div>
+                              <div style="font-size:20px;font-weight:800;color:#4ade80;">{isguc:,.0f} ₺</div>
+                              <div style="font-size:10px;color:#9B6FBF;">300 ₺/saat</div>
+                            </div>
+                          </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        mud_bas = mud_bas_time.strftime("%H:%M")
+                        mud_bit = mud_bit_time.strftime("%H:%M")
 
                         col_k4,col_k5 = st.columns(2)
                         with col_k4:
@@ -1596,8 +1642,6 @@ with tab_kapat:
                         if submit_kapat:
                             if not mudahale_eden.strip():
                                 st.error("❌ Teknisyen adı zorunludur.")
-                            elif not parse_ok:
-                                st.error("❌ Saat formatı hatalı.")
                             elif not cozum_aciklama.strip():
                                 st.error("❌ Çözüm açıklaması zorunludur.")
                             elif not tum_tamam:

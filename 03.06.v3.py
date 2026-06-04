@@ -1545,76 +1545,89 @@ with tab_kapat:
                         except Exception as e:
                             st.caption(f"Checklist yüklenemedi: {e}")
 
-                    with st.form("kapat_formu"):
-                        st.markdown("##### 👤 Teknisyen & Zaman")
-                        col_k1,col_k2,col_k3 = st.columns(3)
-                        with col_k1:
-                            mudahale_eden = st.text_input("Müdahale Eden Teknisyen *",
-                                value=st.session_state.get("aktif_tam_ad",""))
-                        with col_k2:
-                            mud_bas_time = st.time_input("🕐 Müdahaleye Başlama",
-                                value=datetime.now().time(),
-                                help="Teknisyenin müdahaleye başladığı saat")
-                        with col_k3:
-                            mud_bit_time = st.time_input("🕑 Arıza Giderilme",
-                                value=datetime.now().time(),
-                                help="Arızanın giderildiği saat")
+                    # Saat seçiciler FORM DIŞINDA — anlık hesaplama için
+                    st.markdown("##### 👤 Teknisyen & Zaman")
+                    col_k1, col_k2, col_k3 = st.columns(3)
+                    with col_k1:
+                        mudahale_eden_dis = st.text_input(
+                            "Müdahale Eden Teknisyen *",
+                            value=st.session_state.get("aktif_tam_ad",""),
+                            key="mud_eden_dis"
+                        )
+                    with col_k2:
+                        mud_bas_time = st.time_input(
+                            "🕐 Müdahaleye Başlama",
+                            value=datetime.now().time(),
+                            key="mud_bas_time",
+                            help="Teknisyenin müdahaleye başladığı saat"
+                        )
+                    with col_k3:
+                        mud_bit_time = st.time_input(
+                            "🕑 Arıza Giderilme",
+                            value=datetime.now().time(),
+                            key="mud_bit_time",
+                            help="Arızanın giderildiği saat"
+                        )
 
-                        # Otomatik süre hesapla
-                        try:
-                            bugun = date.today()
-                            bd  = datetime.combine(bugun, mud_bas_time)
-                            btt = datetime.combine(bugun, mud_bit_time)
-                            if btt <= bd:
-                                btt += timedelta(days=1)  # gece yarısı geçişi
-                            cozum_dk = max(1, int((btt - bd).total_seconds() / 60))
-                            parse_ok = True
-                        except:
-                            cozum_dk = 1
-                            parse_ok = False
+                    # Anlık hesapla
+                    try:
+                        bugun = date.today()
+                        bd  = datetime.combine(bugun, mud_bas_time)
+                        btt = datetime.combine(bugun, mud_bit_time)
+                        if btt <= bd:
+                            btt += timedelta(days=1)
+                        cozum_dk = max(1, int((btt - bd).total_seconds() / 60))
+                    except:
+                        cozum_dk = 1
 
-                        # Arıza açılışından bu yana geçen süre
-                        try:
-                            acilis_dt = datetime.strptime(talep["Açılış Tarihi"], "%d/%m/%Y %H:%M")
-                            toplam_dk = int((datetime.now() - acilis_dt).total_seconds() / 60)
-                            bekleme_dk = max(0, toplam_dk - cozum_dk)
-                        except:
-                            toplam_dk = 0
-                            bekleme_dk = 0
+                    try:
+                        acilis_dt  = datetime.strptime(talep["Açılış Tarihi"], "%d/%m/%Y %H:%M")
+                        bekleme_dk = max(0, int((bd - acilis_dt).total_seconds() / 60))
+                        toplam_dk  = max(0, int((btt - acilis_dt).total_seconds() / 60))
+                    except:
+                        bekleme_dk = 0
+                        toplam_dk  = cozum_dk
 
-                        isguc = round((cozum_dk / 60) * ISCI_UCRET, 2)
+                    isguc = round((cozum_dk / 60) * ISCI_UCRET, 2)
+                    mud_bas = mud_bas_time.strftime("%H:%M")
+                    mud_bit = mud_bit_time.strftime("%H:%M")
 
-                        # Süre özet kartı
-                        st.markdown(f"""
-                        <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
-                                    border-radius:10px;padding:12px 16px;margin:8px 0;">
-                          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center;">
-                            <div>
-                              <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">Müdahale Süresi</div>
-                              <div style="font-size:20px;font-weight:800;color:#FFD700;">{cozum_dk} dk</div>
-                              <div style="font-size:10px;color:#9B6FBF;">{cozum_dk//60}s {cozum_dk%60}dk</div>
-                            </div>
-                            <div>
-                              <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">Bekleme Süresi</div>
-                              <div style="font-size:20px;font-weight:800;color:#C89EE8;">{bekleme_dk} dk</div>
-                              <div style="font-size:10px;color:#9B6FBF;">Açılıştan müdahaleye</div>
-                            </div>
-                            <div>
-                              <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">Toplam Süre</div>
-                              <div style="font-size:20px;font-weight:800;color:#E8D5FF;">{toplam_dk} dk</div>
-                              <div style="font-size:10px;color:#9B6FBF;">Açılıştan kapanışa</div>
-                            </div>
-                            <div>
-                              <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">İş Gücü Maliyeti</div>
-                              <div style="font-size:20px;font-weight:800;color:#4ade80;">{isguc:,.0f} ₺</div>
-                              <div style="font-size:10px;color:#9B6FBF;">300 ₺/saat</div>
-                            </div>
-                          </div>
+                    # Süre özet kartı
+                    st.markdown(f"""
+                    <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
+                                border-radius:10px;padding:14px 16px;margin:8px 0 16px 0;">
+                      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center;">
+                        <div>
+                          <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">⚙️ Müdahale Süresi</div>
+                          <div style="font-size:22px;font-weight:800;color:#FFD700;">{cozum_dk} dk</div>
+                          <div style="font-size:10px;color:#9B6FBF;">{mud_bas} → {mud_bit}</div>
                         </div>
-                        """, unsafe_allow_html=True)
+                        <div>
+                          <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">⏳ Bekleme Süresi</div>
+                          <div style="font-size:22px;font-weight:800;color:#C89EE8;">{bekleme_dk} dk</div>
+                          <div style="font-size:10px;color:#9B6FBF;">Açılış → Müdahale</div>
+                        </div>
+                        <div>
+                          <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">📊 Toplam Süre</div>
+                          <div style="font-size:22px;font-weight:800;color:#E8D5FF;">{toplam_dk} dk</div>
+                          <div style="font-size:10px;color:#9B6FBF;">Açılış → Kapanış</div>
+                        </div>
+                        <div>
+                          <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">💰 İş Gücü</div>
+                          <div style="font-size:22px;font-weight:800;color:#4ade80;">{isguc:,.0f} ₺</div>
+                          <div style="font-size:10px;color:#9B6FBF;">300 ₺/saat</div>
+                        </div>
+                      </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                        mud_bas = mud_bas_time.strftime("%H:%M")
-                        mud_bit = mud_bit_time.strftime("%H:%M")
+                    with st.form("kapat_formu"):
+                        # Teknisyen form içinde de göster (gizli)
+                        mudahale_eden = st.text_input(
+                            "Müdahale Eden Teknisyen *",
+                            value=mudahale_eden_dis,
+                            key="mud_eden_form"
+                        )
 
                         col_k4,col_k5 = st.columns(2)
                         with col_k4:

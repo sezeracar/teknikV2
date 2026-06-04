@@ -219,7 +219,8 @@ def sb_to_df(rows: list, kolon_map: dict = None) -> pd.DataFrame:
     # Tüm object kolonları string'e çevir — Arrow serialization hatalarını önle
     for col in df.columns:
         if df[col].dtype == object:
-            df[col] = df[col].astype(str).replace("None", "").replace("nan", "")
+            df[col] = df[col].astype(str)
+            df[col] = df[col].replace({"None": "", "nan": "", "none": "", "<NA>": ""})
     return df
 
 ARIZA_KOLON_MAP = {
@@ -1475,8 +1476,13 @@ with tab_rapor:
                     file_name=f"ariza_raporu_{datetime.now().strftime('%Y%m%d_%H%M')}.csv", mime="text/csv")
 
             if not g.empty:
-                try:    st.dataframe(g.sort_values("Açılış Tarihi",ascending=False), use_container_width=True, hide_index=True)
-                except: st.dataframe(g, use_container_width=True, hide_index=True)
+                try:
+                    if "Açılış Tarihi" in g.columns:
+                        st.dataframe(g.sort_values("Açılış Tarihi", ascending=False), use_container_width=True, hide_index=True)
+                    else:
+                        st.dataframe(g, use_container_width=True, hide_index=True)
+                except:
+                    st.dataframe(g, use_container_width=True, hide_index=True)
 
             # ── Makine Bazlı MTTR / MTBF Özeti ───────────────────────
             st.markdown("---")
@@ -1691,13 +1697,17 @@ with tab_stok:
         if df_st.empty or "Malzeme Adı" not in df_st.columns:
             st.info("📦 Stok verisi yükleniyor veya henüz kayıt yok.")
         else:
+            df_st["Stok Miktarı"]  = pd.to_numeric(df_st["Stok Miktarı"], errors="coerce").fillna(0)
+            df_st["Kritik Seviye"] = pd.to_numeric(df_st["Kritik Seviye"], errors="coerce").fillna(0)
             kritik_stok = df_st[df_st["Stok Miktarı"]<=df_st["Kritik Seviye"]]
             for _,row in kritik_stok.iterrows():
                 st.markdown(f'''<div class="kritik-banner">⚠️ <strong style="color:#fbbf24;">ACİL SİPARİŞ:</strong> <span style="color:#cbd5e1;">{row["Malzeme Adı"]}</span> — Mevcut: <strong style="color:#f87171;">{row["Stok Miktarı"]} {row.get("Birim","adet")}</strong> / Kritik: {row["Kritik Seviye"]}</div>''', unsafe_allow_html=True)
 
             if df_st["Maksimum Stok"].sum() > 0:
                 df_st2 = df_st.copy()
-                df_st2["Doluluk %"] = (df_st2["Stok Miktarı"]/df_st2["Maksimum Stok"].replace(0,1)*100).round(1).clip(upper=100)
+                df_st2["Doluluk %"] = (pd.to_numeric(df_st2["Stok Miktarı"],errors="coerce").fillna(0) /
+                               pd.to_numeric(df_st2["Maksimum Stok"],errors="coerce").replace(0,1).fillna(1) * 100
+                              ).round(1).clip(upper=100)
                 st.markdown("#### Stok Doluluk Oranları")
                 st.bar_chart(df_st2.set_index("Malzeme Adı")["Doluluk %"], height=240)
 

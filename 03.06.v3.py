@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-TEKNIK BAKIM & ARIZA YÖNETİM SİSTEMİ v2.0
+TEKNIK BAKIM & BAKIM ARIZA YÖNETİM SİSTEMİ v2.0
 Enterprise-Grade TPM & CMMS Platform — Supabase Edition
 =============================================================================
 """

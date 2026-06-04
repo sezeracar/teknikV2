@@ -860,9 +860,23 @@ with tab_yeni:
         st.session_state["_talep_gonderildi"] = False
 
     # QR koddan gelen URL parametrelerini oku
-    qr_params    = st.query_params
-    qr_makine    = qr_params.get("makine", "")
-    qr_bolge     = qr_params.get("bolge", "")
+    import base64, json as _json
+    qr_params = st.query_params
+    qr_makine = ""
+    qr_bolge  = ""
+    try:
+        d = qr_params.get("d", "")
+        if d:
+            veri = _json.loads(base64.urlsafe_b64decode(d + "==").decode())
+            qr_makine = veri.get("makine", "")
+            qr_bolge  = veri.get("bolge", "")
+        else:
+            # Eski format desteği
+            qr_makine = qr_params.get("makine", "")
+            qr_bolge  = qr_params.get("bolge", "")
+    except:
+        qr_makine = qr_params.get("makine", "")
+        qr_bolge  = qr_params.get("bolge", "")
 
     # Bölge varsayılanı — QR'dan geldiyse onu seç
     bolge_index  = 0
@@ -1530,6 +1544,113 @@ with tab_rapor:
                         except Exception as e:
                             st.caption(f"Hesaplanamadı: {e}")
 
+            # ── Teknisyen İş Yükü Dengesi ─────────────────────────────
+            st.markdown("---")
+            st.markdown("#### 👨‍🔧 Teknisyen İş Yükü & Performans Analizi")
+            try:
+                df_tek = df_r.copy() if not df_r.empty else pd.DataFrame()
+                if df_tek.empty or "Müdahale Eden" not in df_tek.columns:
+                    st.caption("Henüz kapatılmış arıza verisi yok.")
+                else:
+                    df_tek_k = df_tek[
+                        (df_tek["Durum"] == "Kapalı") &
+                        (df_tek["Müdahale Eden"].notna()) &
+                        (df_tek["Müdahale Eden"] != "") &
+                        (df_tek["Müdahale Eden"] != "None")
+                    ].copy()
+
+                    if df_tek_k.empty:
+                        st.caption("Kapatılmış arıza kaydı bulunamadı.")
+                    else:
+                        df_tek_k["sure"] = pd.to_numeric(df_tek_k["Çözüm Süresi (Dk)"], errors="coerce").fillna(0)
+
+                        teknisyen_ozet = []
+                        for tek, grp in df_tek_k.groupby("Müdahale Eden"):
+                            if not tek or tek in ["", "None", "nan"]:
+                                continue
+                            toplam      = len(grp)
+                            ort_sure    = round(grp["sure"].mean(), 1)
+                            min_sure    = round(grp["sure"].min(), 1)
+                            max_sure    = round(grp["sure"].max(), 1)
+                            toplam_sure = round(grp["sure"].sum(), 0)
+                            kritik_say  = len(grp[grp["Öncelik"].str.contains("KRİTİK", na=False)])
+                            sla_basari  = len(grp[grp["SLA Durumu"].str.contains("İçinde", na=False)])
+                            sla_oran    = round(sla_basari / max(toplam, 1) * 100, 1)
+
+                            teknisyen_ozet.append({
+                                "Teknisyen":         tek,
+                                "Toplam Arıza":      toplam,
+                                "Kritik Arıza":      kritik_say,
+                                "Ort. Süre (dk)":    ort_sure,
+                                "En Hızlı (dk)":     min_sure,
+                                "En Uzun (dk)":      max_sure,
+                                "Toplam Süre (dk)":  int(toplam_sure),
+                                "SLA Başarı (%)":    sla_oran,
+                                "Puan":              "🥇" if sla_oran >= 90 else "🥈" if sla_oran >= 70 else "🥉"
+                            })
+
+                        if teknisyen_ozet:
+                            df_tek_ozet = pd.DataFrame(teknisyen_ozet).sort_values(
+                                "Toplam Arıza", ascending=False
+                            )
+
+                            # KPI kartlar — en iyi teknisyen
+                            en_hizli = df_tek_ozet.loc[df_tek_ozet["Ort. Süre (dk)"].idxmin()]
+                            en_aktif = df_tek_ozet.iloc[0]
+                            en_basarili = df_tek_ozet.loc[df_tek_ozet["SLA Başarı (%)"].idxmax()]
+
+                            col_t1, col_t2, col_t3 = st.columns(3)
+                            with col_t1:
+                                st.markdown(f"""
+                                <div style="background:rgba(22,163,74,0.1);border:1px solid rgba(22,163,74,0.3);
+                                            border-radius:10px;padding:14px 16px;">
+                                  <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">🏃 EN HIZLI</div>
+                                  <div style="font-size:18px;font-weight:700;color:#4ade80;margin-top:4px;">{en_hizli["Teknisyen"]}</div>
+                                  <div style="font-size:12px;color:#94a3b8;">Ort. {en_hizli["Ort. Süre (dk)"]} dk</div>
+                                </div>""", unsafe_allow_html=True)
+                            with col_t2:
+                                st.markdown(f"""
+                                <div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);
+                                            border-radius:10px;padding:14px 16px;">
+                                  <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">💪 EN AKTİF</div>
+                                  <div style="font-size:18px;font-weight:700;color:#93c5fd;margin-top:4px;">{en_aktif["Teknisyen"]}</div>
+                                  <div style="font-size:12px;color:#94a3b8;">{en_aktif["Toplam Arıza"]} arıza</div>
+                                </div>""", unsafe_allow_html=True)
+                            with col_t3:
+                                st.markdown(f"""
+                                <div style="background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);
+                                            border-radius:10px;padding:14px 16px;">
+                                  <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">🎯 EN BAŞARILI</div>
+                                  <div style="font-size:18px;font-weight:700;color:#fbbf24;margin-top:4px;">{en_basarili["Teknisyen"]}</div>
+                                  <div style="font-size:12px;color:#94a3b8;">%{en_basarili["SLA Başarı (%)"]} SLA</div>
+                                </div>""", unsafe_allow_html=True)
+
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            st.dataframe(df_tek_ozet, use_container_width=True, hide_index=True)
+
+                            # Bar grafik — arıza sayısı
+                            st.markdown("**Teknisyen Bazlı Arıza Dağılımı**")
+                            st.bar_chart(
+                                df_tek_ozet.set_index("Teknisyen")["Toplam Arıza"],
+                                height=220
+                            )
+
+                            # İş yükü dengesi uyarısı
+                            max_ariza = df_tek_ozet["Toplam Arıza"].max()
+                            min_ariza = df_tek_ozet["Toplam Arıza"].min()
+                            if max_ariza > 0 and (max_ariza / max(min_ariza, 1)) > 3:
+                                st.warning(f"⚠️ İş yükü dengesiz — **{en_aktif['Teknisyen']}** diğerlerinden 3x fazla arızaya bakıyor. Görev dağılımını gözden geçirin.")
+
+                            # İndir
+                            st.download_button(
+                                "📥 Teknisyen Raporu İndir",
+                                df_tek_ozet.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+                                file_name=f"teknisyen_raporu_{datetime.now().strftime('%Y%m%d')}.csv",
+                                mime="text/csv"
+                            )
+            except Exception as e:
+                st.caption(f"Teknisyen analizi yüklenemedi: {e}")
+
 # =============================================================================
 # SEKME 5: STOK YÖNETİMİ
 # =============================================================================
@@ -1856,16 +1977,26 @@ with tab_ayar:
                         key="qr_makine")
 
                 with col_qr2:
-                    # QR URL oluştur
+                    # Hash fragment kullan — Streamlit ? parametrelerini blokluyor
                     from urllib.parse import quote
-                    qr_url = f"{app_url}/?makine={quote(qr_makine_sec)}&bolge={quote(qr_bolge_sec)}"
+                    # Makine ve bölge bilgisini base64 encode et
+                    import base64, json
+                    veri = json.dumps({"makine": qr_makine_sec, "bolge": qr_bolge_sec})
+                    encoded = base64.urlsafe_b64encode(veri.encode()).decode()
+                    qr_url  = f"{app_url}/?d={encoded}"
 
                     # TinyURL ile kısalt
                     kisa_url = qr_url
                     try:
-                        r_tiny = requests.get(f"https://tinyurl.com/api-create.php?url={quote(qr_url, safe='')}", timeout=5)
+                        r_tiny = requests.get(
+                            f"https://tinyurl.com/api-create.php?url={quote(qr_url, safe='')}",
+                            timeout=5
+                        )
                         if r_tiny.ok and r_tiny.text.startswith("http"):
-                            kisa_url = r_tiny.text.strip()
+                            kisa_url = r_tiny.text.strip().replace(
+                                "tinyurl.com/preview/deprecated/",
+                                "tinyurl.com/"
+                            )
                     except:
                         pass
 

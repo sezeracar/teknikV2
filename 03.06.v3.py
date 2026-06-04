@@ -671,25 +671,27 @@ sidebar_giris()
 # ── Sidebar QR Kod Girişi ─────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("---")
-    st.markdown("<div style='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#475569;padding-left:4px;margin-bottom:8px;'>📱 HIZLI ARIZA BİLDİRİM</div>", unsafe_allow_html=True)
+    st.markdown("""<div style='font-size:11px;font-weight:700;text-transform:uppercase;
+        letter-spacing:0.08em;color:#3b82f6;padding-left:4px;margin-bottom:8px;'>
+        📱 HIZLI ARIZA BİLDİRİM</div>""", unsafe_allow_html=True)
     qr_kod_giris = st.text_input(
-        "Makine Kodu Gir",
-        placeholder="Örn: VNA2",
-        help="Makine üzerindeki kodu yazın",
-        key="sidebar_qr_kod"
+        "Makine Kodu",
+        placeholder="Örn: VNA1",
+        help="Makine üzerindeki kodu yazın — Enter'a basın",
+        key="sidebar_qr_kod",
+        label_visibility="collapsed"
     ).strip().upper()
+    st.caption("👆 Makine kodunu yazıp Enter'a basın")
     if qr_kod_giris:
         try:
             qr_rows = sb_select("qr_kodlar", f"kod=eq.{qr_kod_giris}&aktif=eq.true")
             if qr_rows:
                 st.session_state["qr_makine"] = qr_rows[0]["makine"]
                 st.session_state["qr_bolge"]  = qr_rows[0]["bolge"]
-                st.success(f"✅ {qr_rows[0]['makine']}")
                 st.session_state["goto_yeni_talep"] = True
+                st.success(f"✅ {qr_rows[0]['makine']}\n{qr_rows[0]['bolge']}")
             else:
                 st.error("❌ Kod bulunamadı")
-                st.session_state["qr_makine"] = ""
-                st.session_state["qr_bolge"]  = ""
         except:
             pass
 
@@ -700,22 +702,24 @@ st.markdown("""
   <p style="color:#475569;font-size:13px;margin-top:4px;">Computerized Maintenance Management System — Endüstriyel TPM Platformu</p>
 </div>""", unsafe_allow_html=True)
 
-# QR kod veya session state'ten sekme yönlendirmesi
-_qr_check = st.session_state.get("goto_yeni_talep", False)
-
-if _qr_check:
+# QR kod session state kontrolü
+_goto_yeni = st.session_state.get("goto_yeni_talep", False)
+if _goto_yeni:
     st.session_state["goto_yeni_talep"] = False
     components.html("""
     <script>
-    setTimeout(function() {
+    function clickYeniTalep() {
         var tabs = window.parent.document.querySelectorAll('[role="tab"]');
         for (var i = 0; i < tabs.length; i++) {
-            if (tabs[i].innerText.includes("Yeni Talep")) {
+            if (tabs[i].innerText.indexOf("Yeni Talep") >= 0) {
                 tabs[i].click();
-                break;
+                return;
             }
         }
-    }, 500);
+    }
+    setTimeout(clickYeniTalep, 300);
+    setTimeout(clickYeniTalep, 800);
+    setTimeout(clickYeniTalep, 1500);
     </script>
     """, height=0)
 

@@ -1029,108 +1029,79 @@ with tab_pano:
             sla_dis = 220 - sla_ic
 
             # ── TAM HTML DASHBOARD ────────────────────────────────────
-            st.markdown(f"""
+            # ── TAM HTML DASHBOARD ────────────────────────────────────
+            avail_renk_css = "#4ade80" if avail>=85 else "#FFD700" if avail>=70 else "#E91E8C"
+            avail_txt = "✅ Hedef üstü" if avail>=85 else "⚠️ Geliştirilmeli"
+            sla_ic_val = round(sla_basari/100*220, 1)
+            sla_dis_val = round(220 - sla_ic_val, 1)
+
+            html_dashboard = """
 <style>
-.dash-card{{background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);border-radius:10px;padding:16px;}}
-.dash-title{{font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:12px;}}
+.dc{background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);border-radius:10px;padding:16px;margin-bottom:0;}
+.dt{font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:12px;}
+.kpi-lbl{font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;}
+.kpi-val{font-size:32px;font-weight:800;line-height:1;}
+.kpi-sub{font-size:11px;margin-top:5px;}
 </style>
 <div style="padding:4px 0;">
-
-<!-- KPI ROW -->
 <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">
-  <div class="dash-card" style="border-color:rgba(255,215,0,0.25);">
-    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">📋 Toplam Talep</div>
-    <div style="font-size:32px;font-weight:800;color:#FFD700;line-height:1;">{toplam}</div>
-    <div style="font-size:11px;color:#4ade80;margin-top:5px;">+{bugun_s} bugün</div>
-  </div>
-  <div class="dash-card" style="border-color:rgba(233,30,140,0.3);">
-    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">🚨 Açık / Kritik</div>
-    <div style="font-size:32px;font-weight:800;color:#E91E8C;line-height:1;">{acik}</div>
-    <div style="font-size:11px;color:#E91E8C;margin-top:5px;">{kritik} kritik acil</div>
-  </div>
-  <div class="dash-card">
-    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">📈 Availability</div>
-    <div style="font-size:32px;font-weight:800;color:{avail_renk};line-height:1;">%{avail}</div>
-    <div style="font-size:11px;color:{avail_renk};margin-top:5px;">{"✅ Hedef üstü" if avail>=85 else "⚠️ Geliştirilmeli"}</div>
-  </div>
-  <div class="dash-card">
-    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">⏱ Ort. MTTR</div>
-    <div style="font-size:32px;font-weight:800;color:#FFD700;line-height:1;">{int(ort_mttr)}<span style="font-size:14px;color:#9B6FBF;"> dk</span></div>
-    <div style="font-size:11px;color:#9B6FBF;margin-top:5px;">Ortalama tamir süresi</div>
-  </div>
-  <div class="dash-card">
-    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">💰 Toplam Maliyet</div>
-    <div style="font-size:24px;font-weight:800;color:#FFD700;line-height:1;">{toplam_maliyet:,.0f}<span style="font-size:12px;color:#9B6FBF;"> ₺</span></div>
-    <div style="font-size:11px;color:#9B6FBF;margin-top:5px;">SLA Uyum: %{sla_basari}</div>
-  </div>
-</div>
+"""
+            html_dashboard += '<div class="dc" style="border-color:rgba(255,215,0,0.25);"><div class="kpi-lbl">📋 Toplam Talep</div>'
+            html_dashboard += f'<div class="kpi-val" style="color:#FFD700;">{toplam}</div>'
+            html_dashboard += f'<div class="kpi-sub" style="color:#4ade80;">+{bugun_s} bugün</div></div>'
 
-<!-- CHARTS ROW -->
-<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
-  <!-- Makine Bazlı -->
-  <div class="dash-card">
-    <div class="dash-title">📊 Makine Bazlı Arıza (Top 5)</div>
-    {mak_html}
-  </div>
+            html_dashboard += '<div class="dc" style="border-color:rgba(233,30,140,0.3);"><div class="kpi-lbl">🚨 Açık / Kritik</div>'
+            html_dashboard += f'<div class="kpi-val" style="color:#E91E8C;">{acik}</div>'
+            html_dashboard += f'<div class="kpi-sub" style="color:#E91E8C;">{kritik} kritik acil</div></div>'
 
-  <!-- SLA + Özet -->
-  <div class="dash-card">
-    <div class="dash-title">⏱ SLA Performansı</div>
-    <div style="display:flex;align-items:center;gap:16px;">
-      <svg width="90" height="90" viewBox="0 0 90 90">
-        <circle cx="45" cy="45" r="35" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="16"/>
-        <circle cx="45" cy="45" r="35" fill="none" stroke="#FFD700" stroke-width="16"
-          stroke-dasharray="{sla_ic} {sla_dis}" stroke-dashoffset="55" transform="rotate(-90 45 45)"/>
-        <circle cx="45" cy="45" r="35" fill="none" stroke="#E91E8C" stroke-width="16"
-          stroke-dasharray="{sla_dis} {sla_ic}" stroke-dashoffset="{55-sla_ic}" transform="rotate(-90 45 45)"/>
-        <text x="45" y="44" text-anchor="middle" font-size="13" font-weight="800" fill="#FFD700">%{sla_basari}</text>
-        <text x="45" y="57" text-anchor="middle" font-size="9" fill="#9B6FBF">SLA</text>
-      </svg>
-      <div>
-        <div style="margin-bottom:10px;">
-          <div style="font-size:22px;font-weight:800;color:#4ade80;">{toplam-sla_asan}</div>
-          <div style="font-size:10px;color:#9B6FBF;">SLA İçinde</div>
-        </div>
-        <div>
-          <div style="font-size:22px;font-weight:800;color:#E91E8C;">{sla_asan}</div>
-          <div style="font-size:10px;color:#9B6FBF;">Aşıldı</div>
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:12px;border-top:1px solid rgba(255,215,0,0.1);padding-top:10px;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;">
-        <div style="background:rgba(255,215,0,0.05);border-radius:8px;padding:8px;">
-          <div style="font-size:18px;font-weight:800;color:#FFD700;">{kapali}</div>
-          <div style="font-size:10px;color:#9B6FBF;">Kapatılan</div>
-        </div>
-        <div style="background:rgba(233,30,140,0.05);border-radius:8px;padding:8px;">
-          <div style="font-size:18px;font-weight:800;color:#E91E8C;">{acik}</div>
-          <div style="font-size:10px;color:#9B6FBF;">Açık</div>
-        </div>
-      </div>
-    </div>
-  </div>
+            html_dashboard += f'<div class="dc"><div class="kpi-lbl">📈 Availability</div>'
+            html_dashboard += f'<div class="kpi-val" style="color:{avail_renk_css};">%{avail}</div>'
+            html_dashboard += f'<div class="kpi-sub" style="color:{avail_renk_css};">{avail_txt}</div></div>'
 
-  <!-- Teknisyen -->
-  <div class="dash-card">
-    <div class="dash-title">👨‍🔧 Teknisyen Performansı</div>
-    {tek_html if tek_html else '<div style="font-size:12px;color:#9B6FBF;">Henüz veri yok.</div>'}
-  </div>
-</div>
+            html_dashboard += f'<div class="dc"><div class="kpi-lbl">⏱ Ort. MTTR</div>'
+            html_dashboard += f'<div class="kpi-val" style="color:#FFD700;">{int(ort_mttr)}<span style="font-size:14px;color:#9B6FBF;"> dk</span></div>'
+            html_dashboard += '<div class="kpi-sub" style="color:#9B6FBF;">Ortalama tamir süresi</div></div>'
 
-<!-- AÇIK TALEPLER -->
-<div class="dash-card" style="margin-bottom:16px;">
-  <div class="dash-title" style="margin-bottom:10px;">🚨 Aktif Açık Talepler {f'<span style="background:rgba(233,30,140,0.15);color:#E91E8C;border:1px solid rgba(233,30,140,0.3);border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;margin-left:8px;">{kritik} KRİTİK</span>' if kritik > 0 else ''}</div>
-  <div style="display:grid;grid-template-columns:90px 1fr 80px 90px 70px;gap:8px;
-      font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;
-      padding-bottom:8px;border-bottom:1px solid rgba(255,215,0,0.1);margin-bottom:4px;">
-    <div>Talep No</div><div>Makine</div><div>Öncelik</div><div>Bölge</div><div>Süre</div>
-  </div>
-  {adf_rows if adf_rows else '<div style="font-size:13px;color:#4ade80;padding:12px 0;">✅ Açık talep bulunmuyor.</div>'}
-</div>
+            html_dashboard += f'<div class="dc"><div class="kpi-lbl">💰 Toplam Maliyet</div>'
+            html_dashboard += f'<div style="font-size:24px;font-weight:800;color:#FFD700;line-height:1;">{toplam_maliyet:,.0f}<span style="font-size:12px;color:#9B6FBF;"> ₺</span></div>'
+            html_dashboard += f'<div class="kpi-sub" style="color:#9B6FBF;">SLA Uyum: %{sla_basari}</div></div>'
+            html_dashboard += '</div>'
 
-</div>
-""", unsafe_allow_html=True)
+            # Charts row
+            html_dashboard += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">'
+
+            # Makine bar
+            html_dashboard += '<div class="dc"><div class="dt">📊 Makine Bazlı Arıza (Top 5)</div>'
+            html_dashboard += mak_html
+            html_dashboard += '</div>'
+
+            # SLA Donut
+            html_dashboard += '<div class="dc"><div class="dt">⏱ SLA Performansı</div>'
+            html_dashboard += '<div style="display:flex;align-items:center;gap:16px;">'
+            html_dashboard += f'<svg width="90" height="90" viewBox="0 0 90 90"><circle cx="45" cy="45" r="35" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="16"/><circle cx="45" cy="45" r="35" fill="none" stroke="#FFD700" stroke-width="16" stroke-dasharray="{sla_ic_val} {sla_dis_val}" stroke-dashoffset="55" transform="rotate(-90 45 45)"/><text x="45" y="44" text-anchor="middle" font-size="13" font-weight="800" fill="#FFD700">%{sla_basari}</text><text x="45" y="57" text-anchor="middle" font-size="9" fill="#9B6FBF">SLA</text></svg>'
+            html_dashboard += f'<div><div style="margin-bottom:10px;"><div style="font-size:22px;font-weight:800;color:#4ade80;">{toplam-sla_asan}</div><div style="font-size:10px;color:#9B6FBF;">SLA İçinde</div></div>'
+            html_dashboard += f'<div><div style="font-size:22px;font-weight:800;color:#E91E8C;">{sla_asan}</div><div style="font-size:10px;color:#9B6FBF;">Aşıldı</div></div></div></div>'
+            html_dashboard += f'<div style="margin-top:12px;border-top:1px solid rgba(255,215,0,0.1);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;">'
+            html_dashboard += f'<div style="background:rgba(255,215,0,0.05);border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#FFD700;">{kapali}</div><div style="font-size:10px;color:#9B6FBF;">Kapatılan</div></div>'
+            html_dashboard += f'<div style="background:rgba(233,30,140,0.05);border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#E91E8C;">{acik}</div><div style="font-size:10px;color:#9B6FBF;">Açık</div></div></div>'
+            html_dashboard += '</div>'
+
+            # Teknisyen
+            html_dashboard += '<div class="dc"><div class="dt">👨‍🔧 Teknisyen Performansı</div>'
+            html_dashboard += tek_html if tek_html else '<div style="font-size:12px;color:#9B6FBF;">Henüz veri yok.</div>'
+            html_dashboard += '</div>'
+            html_dashboard += '</div>'
+
+            # Açık talepler tablosu
+            krit_badge = f'<span style="background:rgba(233,30,140,0.15);color:#E91E8C;border:1px solid rgba(233,30,140,0.3);border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;margin-left:8px;">{kritik} KRİTİK</span>' if kritik > 0 else ""
+            html_dashboard += f'<div class="dc" style="margin-bottom:16px;">'
+            html_dashboard += f'<div class="dt" style="margin-bottom:10px;">🚨 Aktif Açık Talepler {krit_badge}</div>'
+            html_dashboard += '<div style="display:grid;grid-template-columns:90px 1fr 80px 90px 70px;gap:8px;font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:8px;border-bottom:1px solid rgba(255,215,0,0.1);margin-bottom:4px;">'
+            html_dashboard += '<div>Talep No</div><div>Makine</div><div>Öncelik</div><div>Bölge</div><div>Süre</div></div>'
+            html_dashboard += adf_rows if adf_rows else '<div style="font-size:13px;color:#4ade80;padding:12px 0;">✅ Açık talep bulunmuyor.</div>'
+            html_dashboard += '</div></div>'
+
+            st.markdown(html_dashboard, unsafe_allow_html=True)
 
             # Bakım uyarıları
             try:

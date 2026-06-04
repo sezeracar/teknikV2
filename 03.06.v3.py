@@ -216,6 +216,10 @@ def sb_to_df(rows: list, kolon_map: dict = None) -> pd.DataFrame:
                 "Çözüm Süresi (Dk)","Malzeme Maliyeti (TL)","İş Gücü Maliyeti (TL)","Toplam Maliyet (TL)"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    # Tüm object kolonları string'e çevir — Arrow serialization hatalarını önle
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].astype(str).replace("None", "").replace("nan", "")
     return df
 
 ARIZA_KOLON_MAP = {
@@ -670,6 +674,26 @@ st.markdown("""
   <p style="color:#475569;font-size:13px;margin-top:4px;">Computerized Maintenance Management System — Endüstriyel TPM Platformu</p>
 </div>""", unsafe_allow_html=True)
 
+# QR parametresi varsa Yeni Talep sekmesini varsayılan yap
+_qr_check = st.query_params.get("makine", "")
+_default_tab = 1 if _qr_check else 0
+
+if _qr_check:
+    # JavaScript ile "Yeni Talep Aç" sekmesine otomatik tıkla
+    components.html("""
+    <script>
+    setTimeout(function() {
+        var tabs = window.parent.document.querySelectorAll('[role="tab"]');
+        for (var i = 0; i < tabs.length; i++) {
+            if (tabs[i].innerText.includes("Yeni Talep")) {
+                tabs[i].click();
+                break;
+            }
+        }
+    }, 800);
+    </script>
+    """, height=0)
+
 tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_oee, tab_ayar = st.tabs([
     "📊 Canlı Pano","➕ Yeni Talep Aç","✅ Talep Kapat",
     "📋 Raporlama & Arşiv","📦 Stok Yönetimi","🔧 Bakım Planları",
@@ -835,18 +859,23 @@ with tab_yeni:
     else:
         st.session_state["_talep_gonderildi"] = False
 
-    # Bölge seçimi form dışında — makine listesini dinamik günceller
     # QR koddan gelen URL parametrelerini oku
     qr_params    = st.query_params
     qr_makine    = qr_params.get("makine", "")
     qr_bolge     = qr_params.get("bolge", "")
 
     # Bölge varsayılanı — QR'dan geldiyse onu seç
-    bolge_index  = BOLGELER.index(qr_bolge) if qr_bolge in BOLGELER else 0
+    bolge_index  = 0
+    if qr_bolge:
+        # Emoji olmadan karşılaştır
+        for i, b in enumerate(BOLGELER):
+            if qr_bolge.strip() in b or b in qr_bolge.strip():
+                bolge_index = i
+                break
     secili_bolge = st.selectbox("🏭 Tesis / Bölge *", BOLGELER, index=bolge_index)
 
     if qr_makine:
-        st.info(f"📱 QR Kod ile bağlandınız — Makine: **{qr_makine}** | Bölge: **{secili_bolge}**")
+        st.info(f"📱 QR Kod ile bağlandınız — Makine: **{qr_makine}**")
 
     # Arıza kategorisi ve alt kategori form dışında — birbirine bağlı dinamik güncellenir
     ariza_liste  = aktif_ariza_turleri()

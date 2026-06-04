@@ -872,30 +872,21 @@ tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_oee, tab_ayar
 # =============================================================================
 
 with tab_pano:
-    # Giriş yapmamışsa kısıtlı görünüm
     if not st.session_state.get("oturum_acik", False):
         st.markdown("""
-        <div style="text-align:center;padding:60px 20px;">
+        <div style="text-align:center;padding:80px 20px;">
           <div style="font-size:64px;margin-bottom:20px;">🛡️</div>
-          <div style="font-size:22px;font-weight:800;color:#FFD700;margin-bottom:8px;">TeknikPro CMMS v2.0</div>
-          <div style="font-size:14px;color:#C89EE8;margin-bottom:24px;">
-            Enterprise Bakım & Arıza Yönetim Sistemi<br>
-            Adana LM & Tuzla LM
+          <div style="font-size:24px;font-weight:800;color:#FFD700;margin-bottom:8px;">TeknikPro CMMS v2.0</div>
+          <div style="font-size:14px;color:#C89EE8;margin-bottom:32px;">Enterprise Bakım & Arıza Yönetim Sistemi<br>Adana LM & Tuzla LM</div>
+          <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:16px;
+                      padding:32px;max-width:400px;margin:0 auto;">
+            <div style="font-size:40px;margin-bottom:12px;">🔒</div>
+            <div style="font-size:18px;font-weight:700;color:#FFD700;margin-bottom:8px;">Verileri görmek için giriş yapın</div>
+            <div style="font-size:13px;color:#9B6FBF;">Sol paneldeki giriş formunu kullanın</div>
           </div>
-          <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);
-                      border-radius:12px;padding:24px;max-width:400px;margin:0 auto;">
-            <div style="font-size:32px;margin-bottom:8px;">🔒</div>
-            <div style="font-size:16px;font-weight:700;color:#FFD700;margin-bottom:8px;">
-              Verileri görmek için giriş yapın
-            </div>
-            <div style="font-size:13px;color:#9B6FBF;">
-              Sol paneldeki giriş formunu kullanın
-            </div>
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
     else:
-        col_ref, _ = st.columns([1,6])
+        col_ref, _ = st.columns([1,8])
         with col_ref:
             if st.button("🔄 Yenile", use_container_width=True):
                 ariza_df_getir.clear()
@@ -906,7 +897,7 @@ with tab_pano:
         if df.empty or "Durum" not in df.columns:
             st.info("📭 Sistemde henüz kayıt bulunmuyor.")
         else:
-            # ── KPI Hesapla ───────────────────────────────────────────
+            # ── Veri Hazırla ──────────────────────────────────────────
             toplam   = len(df)
             acik     = len(df[df["Durum"]=="Açık"])
             kapali   = len(df[df["Durum"]=="Kapalı"])
@@ -914,159 +905,246 @@ with tab_pano:
             sla_asan = len(df[df["SLA Durumu"].str.contains("Aşıldı",na=False)])
             bugun    = datetime.now().strftime("%d/%m/%Y")
             bugun_s  = len(df[df["Açılış Tarihi"].str.startswith(bugun,na=False)]) if "Açılış Tarihi" in df.columns else 0
-            df_kap   = df[df["Durum"]=="Kapalı"].copy()
+            sla_basari = round((toplam - sla_asan) / max(toplam,1)*100, 1)
+
+            df_kap = df[df["Durum"]=="Kapalı"].copy()
             df_kap["sure"] = pd.to_numeric(df_kap.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
             ort_mttr = round(df_kap["sure"].mean(), 1) if not df_kap.empty else 0
             toplam_maliyet = pd.to_numeric(df.get("Toplam Maliyet (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0).sum()
-            sla_basari = round((toplam - sla_asan) / max(toplam, 1) * 100, 1)
 
-            # Availability (son 30 gün)
+            # Availability — arıza süresi / toplam çalışma süresi
             try:
-                son30 = df.copy()
-                son30["_t"] = pd.to_datetime(son30["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
-                son30 = son30[son30["_t"] >= date.today()-timedelta(days=30)]
-                dur_top = son30[son30["Durum"]=="Kapalı"]["sure"].sum() if "sure" in son30.columns else                     pd.to_numeric(son30[son30["Durum"]=="Kapalı"].get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").sum()
-                avail = round(max(0, (30*480 - dur_top) / (30*480) * 100), 1)
-            except:
-                avail = 0
-
-            # ── KPI KARTLAR ───────────────────────────────────────────
-            st.markdown(f"""
-            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">
-              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;">
-                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">📋 Toplam Talep</div>
-                <div style="font-size:30px;font-weight:800;color:#FFD700;line-height:1;">{toplam}</div>
-                <div style="font-size:11px;color:#4ade80;margin-top:4px;">+{bugun_s} bugün</div>
-              </div>
-              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(233,30,140,0.3);border-radius:10px;padding:14px 16px;">
-                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">🚨 Açık / Kritik</div>
-                <div style="font-size:30px;font-weight:800;color:#E91E8C;line-height:1;">{acik}</div>
-                <div style="font-size:11px;color:#E91E8C;margin-top:4px;">{kritik} kritik acil</div>
-              </div>
-              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;">
-                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">📈 Availability</div>
-                <div style="font-size:30px;font-weight:800;color:{"#4ade80" if avail>=85 else "#FFD700" if avail>=70 else "#E91E8C"};line-height:1;">%{avail}</div>
-                <div style="font-size:11px;color:#9B6FBF;margin-top:4px;">{"Hedef üstü" if avail>=85 else "Geliştirilmeli"}</div>
-              </div>
-              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;">
-                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">⏱ Ort. MTTR</div>
-                <div style="font-size:30px;font-weight:800;color:#FFD700;line-height:1;">{int(ort_mttr)}<span style="font-size:14px;color:#9B6FBF;"> dk</span></div>
-                <div style="font-size:11px;color:#9B6FBF;margin-top:4px;">Ortalama tamir süresi</div>
-              </div>
-              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;">
-                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">💰 Toplam Maliyet</div>
-                <div style="font-size:24px;font-weight:800;color:#FFD700;line-height:1;">{toplam_maliyet:,.0f}<span style="font-size:12px;color:#9B6FBF;"> ₺</span></div>
-                <div style="font-size:11px;color:#9B6FBF;margin-top:4px;">SLA Uyum: %{sla_basari}</div>
-              </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # ── CHARTS ROW ────────────────────────────────────────────
-            col_g1, col_g2, col_g3 = st.columns(3)
-
-            with col_g1:
-                st.markdown("""<div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);
-                    border-radius:10px;padding:14px;">
-                    <div style="font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:10px;">
-                    📊 Makine Bazlı Arıza</div></div>""", unsafe_allow_html=True)
-                mak_say = df["Makine"].value_counts().head(6)
-                st.bar_chart(mak_say, height=200, use_container_width=True)
-
-            with col_g2:
-                st.markdown("""<div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);
-                    border-radius:10px;padding:14px;">
-                    <div style="font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:10px;">
-                    🔧 Öncelik Dağılımı</div></div>""", unsafe_allow_html=True)
-                if acik > 0:
-                    onc = df[df["Durum"]=="Açık"]["Öncelik"].value_counts()
-                    onc.index = [i[:20] for i in onc.index]
-                    st.bar_chart(onc, height=200, use_container_width=True)
+                if not df_kap.empty and "Kapatma Tarihi" in df_kap.columns:
+                    df_kap["_t"] = pd.to_datetime(df_kap["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
+                    s7 = df_kap[df_kap["_t"] >= date.today()-timedelta(days=7)]
+                    if not s7.empty:
+                        makine_sayisi = max(s7["Makine"].nunique(), 1)
+                        toplam_plan = 7 * 480 * makine_sayisi
+                        toplam_dur  = s7["sure"].sum()
+                        avail = round(max(0, min(100, (toplam_plan - toplam_dur) / toplam_plan * 100)), 1)
+                    else:
+                        avail = 100.0
                 else:
-                    st.info("Açık talep yok")
+                    avail = 100.0
+            except:
+                avail = 0.0
 
-            with col_g3:
-                st.markdown("""<div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);
-                    border-radius:10px;padding:14px;">
-                    <div style="font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:10px;">
-                    📉 30 Günlük Trend</div></div>""", unsafe_allow_html=True)
-                try:
-                    dt2 = df.copy()
-                    dt2["Tarih"] = pd.to_datetime(dt2["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
-                    dt2 = dt2[dt2["Tarih"] >= date.today()-timedelta(days=30)]
-                    gl = dt2.groupby("Tarih").size().rename("Arıza")
-                    if len(gl) > 0:
-                        st.line_chart(gl, height=200, use_container_width=True)
-                except: pass
+            avail_renk = "#4ade80" if avail>=85 else "#FFD700" if avail>=70 else "#E91E8C"
 
-            st.markdown("---")
+            # Makine bazlı top 5
+            mak_top = df["Makine"].value_counts().head(5)
+            mak_max = max(mak_top.values) if len(mak_top) > 0 else 1
 
-            # ── AÇIK TALEPLER ─────────────────────────────────────────
-            st.markdown("#### 🚨 Açık Talepler")
+            # Öncelik dağılımı
+            onc_say = df[df["Durum"]=="Açık"]["Öncelik"].value_counts() if acik > 0 else pd.Series(dtype=int)
+
+            # Teknisyen top 4
+            df_tek = df_kap[df_kap["Müdahale Eden"].notna() & (df_kap["Müdahale Eden"] != "") & (df_kap["Müdahale Eden"] != "None")].copy() if "Müdahale Eden" in df_kap.columns else pd.DataFrame()
+            tek_listesi = []
+            if not df_tek.empty:
+                for tek, grp in df_tek.groupby("Müdahale Eden"):
+                    if tek and tek not in ["","None","nan"]:
+                        sla_b = len(grp[grp["SLA Durumu"].str.contains("İçinde",na=False)]) if "SLA Durumu" in grp.columns else 0
+                        sla_o = round(sla_b/max(len(grp),1)*100,0)
+                        ini   = "".join([w[0].upper() for w in tek.split()[:2]])
+                        tek_listesi.append({"ad":tek,"ini":ini,"sayi":len(grp),"ort":round(grp["sure"].mean(),0),"sla":sla_o})
+                tek_listesi = sorted(tek_listesi, key=lambda x: x["sayi"], reverse=True)[:4]
+
+            # Açık talepler
             adf = df[df["Durum"]=="Açık"].copy()
-            if adf.empty:
-                st.success("✅ Açık talep bulunmuyor.")
-            else:
-                if kritik > 0:
-                    st.markdown(f'''<div class="kritik-banner">
-                        <strong style="color:#E91E8C;">🚨 {kritik} KRİTİK ARIZA acil müdahale bekliyor!</strong>
-                        </div>''', unsafe_allow_html=True)
-                # Otomatik bakım uyarısı
-                if "Bildiren" in adf.columns:
-                    oto = adf[adf["Bildiren"]=="Sistem (Otomatik)"]
-                    if not oto.empty:
-                        st.markdown(f"""<div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);
-                            border-left:4px solid #3b82f6;border-radius:8px;padding:10px 14px;margin-bottom:10px;">
-                            🔧 <strong style="color:#93c5fd;">{len(oto)} periyodik bakım talebi</strong>
-                            <span style="color:#9B6FBF;font-size:12px;"> otomatik açıldı</span></div>""",
-                            unsafe_allow_html=True)
-                gs = [s for s in ["Talep No","Bölge","Öncelik","Açılış Tarihi","Bildiren","Makine","Arıza Tanımı","SLA Durumu"] if s in adf.columns]
-                st.dataframe(adf[gs], use_container_width=True, hide_index=True)
-
-            # ── BAKIM & OEE ÖZET ──────────────────────────────────────
-            st.markdown("---")
-            col_bk, col_oe = st.columns(2)
-
-            with col_bk:
-                st.markdown("#### 🔧 Yaklaşan Bakımlar")
+            adf_rows = ""
+            for _, r in adf.head(5).iterrows():
+                sure_val = ""
                 try:
-                    df_bp = bakim_df_getir()
-                    if not df_bp.empty and "sonraki_bakim_tarihi" in df_bp.columns:
-                        df_bp["_snr"] = pd.to_datetime(df_bp["sonraki_bakim_tarihi"], format="%d/%m/%Y", errors="coerce").dt.date
-                        gec  = df_bp[df_bp["durum"]=="Gecikmiş"]
-                        yak  = df_bp[(df_bp["_snr"]>=date.today()) & (df_bp["_snr"]<=date.today()+timedelta(days=7)) & (df_bp["durum"]=="Bekliyor")]
-                        if not gec.empty:
-                            st.error(f"🔴 {len(gec)} gecikmiş bakım!")
-                        if not yak.empty:
-                            st.warning(f"🟡 Bu hafta {len(yak)} bakım: {', '.join(yak['makine'].tolist()[:3])}")
-                        if gec.empty and yak.empty:
-                            st.success("✅ Yaklaşan gecikmiş bakım yok.")
-                    else:
-                        st.caption("Bakım planı yok.")
-                except Exception:
-                    st.caption("Yüklenemedi.")
+                    ac = datetime.strptime(r.get("Açılış Tarihi",""), "%d/%m/%Y %H:%M")
+                    dk = int((datetime.now()-ac).total_seconds()/60)
+                    sure_val = f"{dk} dk"
+                    sure_renk = "#E91E8C" if dk > 480 else "#FFD700"
+                except:
+                    sure_val = "—"
+                    sure_renk = "#9B6FBF"
 
-            with col_oe:
-                st.markdown("#### 📈 Availability (Son 7 Gün)")
-                try:
-                    if not df_kap.empty and "Kapatma Tarihi" in df_kap.columns:
-                        df_kap["_t"] = pd.to_datetime(df_kap["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
-                        s7 = df_kap[df_kap["_t"] >= date.today()-timedelta(days=7)]
-                        if not s7.empty:
-                            av_mak = {}
-                            for mak, grp in s7.groupby("Makine"):
-                                av_mak[mak] = round(max(0,(7*480-grp["sure"].sum())/(7*480)*100),1)
-                            ort_av = round(sum(av_mak.values())/len(av_mak),1)
-                            renk = "#4ade80" if ort_av>=90 else "#FFD700" if ort_av>=70 else "#E91E8C"
-                            st.markdown(f"""<div style="text-align:center;padding:16px;">
-                                <div style="font-size:42px;font-weight:800;color:{renk};">%{ort_av}</div>
-                                <div style="font-size:12px;color:#9B6FBF;">{"Hedef üstü" if ort_av>=90 else "Geliştirilmeli"}</div>
-                            </div>""", unsafe_allow_html=True)
-                        else:
-                            st.caption("Son 7 günde veri yok.")
-                    else:
-                        st.caption("Yeterli veri yok.")
-                except Exception:
-                    st.caption("Hesaplanamadı.")
+                onc = str(r.get("Öncelik",""))
+                if "KRİTİK" in onc: tag_cls = "tag-red"; tag_txt = "KRİTİK"
+                elif "YÜKSEK" in onc: tag_cls = "tag-yellow"; tag_txt = "YÜKSEK"
+                elif "ORTA" in onc: tag_cls = "tag-purple"; tag_txt = "ORTA"
+                else: tag_cls = "tag-green"; tag_txt = "DÜŞÜK"
+
+                adf_rows += f"""
+                <div style="display:grid;grid-template-columns:90px 1fr 80px 90px 70px;gap:8px;
+                    font-size:11px;color:#E8D5FF;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;">
+                  <div style="color:#FFD700;font-weight:700;">{r.get("Talep No","")}</div>
+                  <div>{str(r.get("Makine",""))[:20]}</div>
+                  <div><span style="border-radius:12px;padding:2px 8px;font-size:10px;font-weight:700;
+                    {'background:rgba(233,30,140,0.15);color:#E91E8C;border:1px solid rgba(233,30,140,0.3)' if tag_cls=='tag-red' else
+                     'background:rgba(255,215,0,0.15);color:#FFD700;border:1px solid rgba(255,215,0,0.3)' if tag_cls=='tag-yellow' else
+                     'background:rgba(155,111,191,0.15);color:#C89EE8;border:1px solid rgba(155,111,191,0.3)' if tag_cls=='tag-purple' else
+                     'background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.2)'};">
+                    {tag_txt}</span></div>
+                  <div style="color:#9B6FBF;font-size:10px;">{str(r.get("Bölge",""))[:12]}</div>
+                  <div style="color:{sure_renk};font-weight:700;">{sure_val}</div>
+                </div>"""
+
+            # Teknisyen HTML
+            tek_html = ""
+            for t in tek_listesi:
+                bar_w = min(int(t["sla"]), 100)
+                tek_html += f"""
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                  <div style="width:34px;height:34px;border-radius:50%;background:rgba(255,215,0,0.15);
+                      border:1px solid rgba(255,215,0,0.3);display:flex;align-items:center;justify-content:center;
+                      font-size:11px;font-weight:800;color:#FFD700;flex-shrink:0;">{t["ini"]}</div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;font-weight:600;color:#E8D5FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{t["ad"]}</div>
+                    <div style="font-size:10px;color:#9B6FBF;">{t["sayi"]} arıza · Ort. {int(t["ort"])} dk</div>
+                    <div style="background:rgba(255,255,255,0.05);border-radius:4px;height:4px;margin-top:4px;overflow:hidden;">
+                      <div style="height:100%;border-radius:4px;background:linear-gradient(90deg,#7B00CC,#FFD700);width:{bar_w}%;"></div>
+                    </div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0;">
+                    <div style="font-size:14px;font-weight:800;color:#FFD700;">%{int(t["sla"])}</div>
+                    <div style="font-size:10px;color:#9B6FBF;">SLA</div>
+                  </div>
+                </div>"""
+
+            # Makine bar HTML
+            mak_html = ""
+            colors = ["#FFD700","#FFD700","#E91E8C","#E91E8C","#C89EE8"]
+            for i,(mak,val) in enumerate(mak_top.items()):
+                w = int(val/mak_max*100)
+                renk = colors[min(i,4)]
+                mak_html += f"""
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                  <div style="font-size:10px;color:#9B6FBF;width:70px;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{str(mak)[:10]}</div>
+                  <div style="flex:1;background:rgba(255,255,255,0.05);border-radius:4px;height:20px;overflow:hidden;">
+                    <div style="width:{w}%;height:100%;border-radius:4px;background:linear-gradient(90deg,#7B00CC,{renk});
+                        display:flex;align-items:center;justify-content:flex-end;padding-right:6px;">
+                      <span style="font-size:10px;font-weight:700;color:#2D0052;">{val}</span>
+                    </div>
+                  </div>
+                </div>"""
+
+            # SLA donut
+            sla_ic = round(sla_basari/100*220,1)
+            sla_dis = 220 - sla_ic
+
+            # ── TAM HTML DASHBOARD ────────────────────────────────────
+            st.markdown(f"""
+<style>
+.dash-card{{background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);border-radius:10px;padding:16px;}}
+.dash-title{{font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:12px;}}
+</style>
+<div style="padding:4px 0;">
+
+<!-- KPI ROW -->
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">
+  <div class="dash-card" style="border-color:rgba(255,215,0,0.25);">
+    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">📋 Toplam Talep</div>
+    <div style="font-size:32px;font-weight:800;color:#FFD700;line-height:1;">{toplam}</div>
+    <div style="font-size:11px;color:#4ade80;margin-top:5px;">+{bugun_s} bugün</div>
+  </div>
+  <div class="dash-card" style="border-color:rgba(233,30,140,0.3);">
+    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">🚨 Açık / Kritik</div>
+    <div style="font-size:32px;font-weight:800;color:#E91E8C;line-height:1;">{acik}</div>
+    <div style="font-size:11px;color:#E91E8C;margin-top:5px;">{kritik} kritik acil</div>
+  </div>
+  <div class="dash-card">
+    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">📈 Availability</div>
+    <div style="font-size:32px;font-weight:800;color:{avail_renk};line-height:1;">%{avail}</div>
+    <div style="font-size:11px;color:{avail_renk};margin-top:5px;">{"✅ Hedef üstü" if avail>=85 else "⚠️ Geliştirilmeli"}</div>
+  </div>
+  <div class="dash-card">
+    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">⏱ Ort. MTTR</div>
+    <div style="font-size:32px;font-weight:800;color:#FFD700;line-height:1;">{int(ort_mttr)}<span style="font-size:14px;color:#9B6FBF;"> dk</span></div>
+    <div style="font-size:11px;color:#9B6FBF;margin-top:5px;">Ortalama tamir süresi</div>
+  </div>
+  <div class="dash-card">
+    <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">💰 Toplam Maliyet</div>
+    <div style="font-size:24px;font-weight:800;color:#FFD700;line-height:1;">{toplam_maliyet:,.0f}<span style="font-size:12px;color:#9B6FBF;"> ₺</span></div>
+    <div style="font-size:11px;color:#9B6FBF;margin-top:5px;">SLA Uyum: %{sla_basari}</div>
+  </div>
+</div>
+
+<!-- CHARTS ROW -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+  <!-- Makine Bazlı -->
+  <div class="dash-card">
+    <div class="dash-title">📊 Makine Bazlı Arıza (Top 5)</div>
+    {mak_html}
+  </div>
+
+  <!-- SLA + Özet -->
+  <div class="dash-card">
+    <div class="dash-title">⏱ SLA Performansı</div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <svg width="90" height="90" viewBox="0 0 90 90">
+        <circle cx="45" cy="45" r="35" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="16"/>
+        <circle cx="45" cy="45" r="35" fill="none" stroke="#FFD700" stroke-width="16"
+          stroke-dasharray="{sla_ic} {sla_dis}" stroke-dashoffset="55" transform="rotate(-90 45 45)"/>
+        <circle cx="45" cy="45" r="35" fill="none" stroke="#E91E8C" stroke-width="16"
+          stroke-dasharray="{sla_dis} {sla_ic}" stroke-dashoffset="{55-sla_ic}" transform="rotate(-90 45 45)"/>
+        <text x="45" y="44" text-anchor="middle" font-size="13" font-weight="800" fill="#FFD700">%{sla_basari}</text>
+        <text x="45" y="57" text-anchor="middle" font-size="9" fill="#9B6FBF">SLA</text>
+      </svg>
+      <div>
+        <div style="margin-bottom:10px;">
+          <div style="font-size:22px;font-weight:800;color:#4ade80;">{toplam-sla_asan}</div>
+          <div style="font-size:10px;color:#9B6FBF;">SLA İçinde</div>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:800;color:#E91E8C;">{sla_asan}</div>
+          <div style="font-size:10px;color:#9B6FBF;">Aşıldı</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;border-top:1px solid rgba(255,215,0,0.1);padding-top:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;">
+        <div style="background:rgba(255,215,0,0.05);border-radius:8px;padding:8px;">
+          <div style="font-size:18px;font-weight:800;color:#FFD700;">{kapali}</div>
+          <div style="font-size:10px;color:#9B6FBF;">Kapatılan</div>
+        </div>
+        <div style="background:rgba(233,30,140,0.05);border-radius:8px;padding:8px;">
+          <div style="font-size:18px;font-weight:800;color:#E91E8C;">{acik}</div>
+          <div style="font-size:10px;color:#9B6FBF;">Açık</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Teknisyen -->
+  <div class="dash-card">
+    <div class="dash-title">👨‍🔧 Teknisyen Performansı</div>
+    {tek_html if tek_html else '<div style="font-size:12px;color:#9B6FBF;">Henüz veri yok.</div>'}
+  </div>
+</div>
+
+<!-- AÇIK TALEPLER -->
+<div class="dash-card" style="margin-bottom:16px;">
+  <div class="dash-title" style="margin-bottom:10px;">🚨 Aktif Açık Talepler {f'<span style="background:rgba(233,30,140,0.15);color:#E91E8C;border:1px solid rgba(233,30,140,0.3);border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;margin-left:8px;">{kritik} KRİTİK</span>' if kritik > 0 else ''}</div>
+  <div style="display:grid;grid-template-columns:90px 1fr 80px 90px 70px;gap:8px;
+      font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;
+      padding-bottom:8px;border-bottom:1px solid rgba(255,215,0,0.1);margin-bottom:4px;">
+    <div>Talep No</div><div>Makine</div><div>Öncelik</div><div>Bölge</div><div>Süre</div>
+  </div>
+  {adf_rows if adf_rows else '<div style="font-size:13px;color:#4ade80;padding:12px 0;">✅ Açık talep bulunmuyor.</div>'}
+</div>
+
+</div>
+""", unsafe_allow_html=True)
+
+            # Bakım uyarıları
+            try:
+                df_bp = bakim_df_getir()
+                if not df_bp.empty and "sonraki_bakim_tarihi" in df_bp.columns:
+                    df_bp["_snr"] = pd.to_datetime(df_bp["sonraki_bakim_tarihi"], format="%d/%m/%Y", errors="coerce").dt.date
+                    gec = df_bp[df_bp["durum"]=="Gecikmiş"]
+                    yak = df_bp[(df_bp["_snr"]>=date.today()) & (df_bp["_snr"]<=date.today()+timedelta(days=7)) & (df_bp["durum"]=="Bekliyor")]
+                    if not gec.empty:
+                        st.error(f"🔴 {len(gec)} gecikmiş bakım var! Bakım Planları sekmesini kontrol edin.")
+                    if not yak.empty:
+                        st.warning(f"🟡 Bu hafta {len(yak)} bakım planlanmış: {', '.join(yak['makine'].tolist()[:3])}")
+            except:
+                pass
 
 with tab_yeni:
     st.markdown("### ➕ Yeni Arıza Bildirimi Oluştur")

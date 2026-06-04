@@ -532,8 +532,14 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; font-size: 14px; 
 
 /* ── BAŞLIKLAR ─────────────────────────────────────────────── */
 h1 { color: #FFD700 !important; font-weight: 800 !important; font-size: 26px !important; }
-h2 { color: #E8D5FF !important; font-weight: 700 !important; }
-h3 { color: #C89EE8 !important; font-weight: 600 !important; }
+h2 { color: #FFD700 !important; font-weight: 700 !important; }
+h3 { color: #E8D5FF !important; font-weight: 600 !important; }
+h4 { color: #C89EE8 !important; font-weight: 600 !important; }
+strong { color: #FFD700 !important; }
+em { color: #C89EE8 !important; }
+li { color: #E8D5FF !important; }
+td, th { color: #E8D5FF !important; }
+th { color: #FFD700 !important; font-weight: 700 !important; }
 p, span, li { color: #E8D5FF !important; }
 label { color: #C89EE8 !important; font-size: 13px !important; }
 

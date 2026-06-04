@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
-TEKNIK BAKIM & BAKIM ARIZA YÖNETİM SİSTEMİ v2.0
+TEKNIK BAKIM & ARIZA YÖNETİM SİSTEMİ v2.0
 Enterprise-Grade TPM & CMMS Platform — Supabase Edition
 =============================================================================
 """
@@ -497,45 +497,182 @@ st.set_page_config(page_title="TeknikPro CMMS v2.0", page_icon="🛡️", layout
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; font-size: 14px; }
-.stApp { background: linear-gradient(160deg, #0f172a 0%, #1e293b 60%, #0f172a 100%) !important; }
-[data-testid="stSidebar"] { background: linear-gradient(180deg, #0c1220 0%, #111827 100%) !important; border-right: 1px solid rgba(99,179,237,0.12) !important; }
-[data-testid="stSidebar"] * { color: #cbd5e1 !important; }
-[data-testid="stSidebar"] h1,[data-testid="stSidebar"] h2,[data-testid="stSidebar"] h3 { color: #93c5fd !important; }
-[data-testid="metric-container"] { background: rgba(30,41,59,0.8) !important; border: 1px solid rgba(99,179,237,0.18) !important; border-radius: 12px !important; padding: 16px 20px !important; }
-[data-testid="metric-container"] label { color: #94a3b8 !important; font-size: 12px !important; font-weight: 600 !important; text-transform: uppercase; }
-[data-testid="metric-container"] [data-testid="stMetricValue"] { color: #f1f5f9 !important; font-size: 28px !important; font-weight: 700 !important; }
-h1 { color: #e2e8f0 !important; font-weight: 700 !important; font-size: 26px !important; }
-h2 { color: #cbd5e1 !important; font-weight: 600 !important; }
-h3 { color: #94a3b8 !important; font-weight: 600 !important; }
-p, span, li { color: #cbd5e1 !important; }
-label { color: #94a3b8 !important; font-size: 13px !important; }
-[data-testid="stTabs"] [role="tablist"] { background: rgba(15,23,42,0.6) !important; border-radius: 10px !important; padding: 4px !important; border: 1px solid rgba(99,179,237,0.12) !important; }
-[data-testid="stTabs"] [role="tab"] { color: #64748b !important; font-weight: 500 !important; font-size: 13px !important; border-radius: 8px !important; padding: 8px 16px !important; }
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] { background: rgba(59,130,246,0.2) !important; color: #93c5fd !important; border: 1px solid rgba(99,179,237,0.35) !important; }
-[data-testid="stTextInput"] input,[data-testid="stTextArea"] textarea { background: rgba(15,23,42,0.9) !important; border: 1px solid rgba(99,179,237,0.2) !important; border-radius: 8px !important; color: #e2e8f0 !important; }
-[data-baseweb="popover"],[data-baseweb="popover"] * { background-color: #1e293b !important; color: #e2e8f0 !important; }
-ul[role="listbox"] { background-color: #1e293b !important; border: 1px solid rgba(99,179,237,0.25) !important; border-radius: 8px !important; }
-li[role="option"] { background-color: #1e293b !important; color: #e2e8f0 !important; }
-li[role="option"]:hover,li[role="option"][aria-selected="true"] { background-color: #2d4a6e !important; color: #ffffff !important; }
-[data-baseweb="menu"] { background-color: #1e293b !important; border: 1px solid rgba(99,179,237,0.25) !important; border-radius: 8px !important; }
-[data-baseweb="menu"] li { color: #e2e8f0 !important; background-color: #1e293b !important; }
-[data-baseweb="menu"] li:hover { background-color: #2d4a6e !important; color: #ffffff !important; }
-[data-testid="stSelectbox"] [data-baseweb="select"] span,[data-testid="stSelectbox"] [data-baseweb="select"] div { color: #e2e8f0 !important; background-color: transparent !important; }
-.stButton > button { background: linear-gradient(135deg, #1d4ed8, #2563eb) !important; color: #ffffff !important; border: none !important; border-radius: 8px !important; font-weight: 600 !important; }
-[data-testid="stFormSubmitButton"] > button { background: linear-gradient(135deg, #059669, #10b981) !important; width: 100% !important; font-weight: 700 !important; border-radius: 10px !important; }
-[data-testid="stDownloadButton"] > button { background: rgba(30,41,59,0.8) !important; border: 1px solid rgba(99,179,237,0.25) !important; color: #93c5fd !important; border-radius: 8px !important; }
-[data-testid="stDataFrame"] { border: 1px solid rgba(99,179,237,0.12) !important; border-radius: 12px !important; }
+
+/* ── ANA ARKA PLAN — Koyu Mor ──────────────────────────────── */
+.stApp { background: linear-gradient(160deg, #2D0052 0%, #3D0066 50%, #2D0052 100%) !important; }
+
+/* ── SIDEBAR ───────────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #1E0038 0%, #2D0052 100%) !important;
+    border-right: 2px solid rgba(255,215,0,0.2) !important;
+}
+[data-testid="stSidebar"] * { color: #E8D5FF !important; }
+[data-testid="stSidebar"] h1,[data-testid="stSidebar"] h2,[data-testid="stSidebar"] h3 { color: #FFD700 !important; }
+
+/* ── METRİK KARTLAR ────────────────────────────────────────── */
+[data-testid="metric-container"] {
+    background: rgba(61,0,102,0.8) !important;
+    border: 1px solid rgba(255,215,0,0.25) !important;
+    border-radius: 12px !important;
+    padding: 16px 20px !important;
+}
+[data-testid="metric-container"] label {
+    color: #C89EE8 !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+}
+[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    color: #FFD700 !important;
+    font-size: 28px !important;
+    font-weight: 800 !important;
+}
+
+/* ── BAŞLIKLAR ─────────────────────────────────────────────── */
+h1 { color: #FFD700 !important; font-weight: 800 !important; font-size: 26px !important; }
+h2 { color: #E8D5FF !important; font-weight: 700 !important; }
+h3 { color: #C89EE8 !important; font-weight: 600 !important; }
+p, span, li { color: #E8D5FF !important; }
+label { color: #C89EE8 !important; font-size: 13px !important; }
+
+/* ── SEKMELER ──────────────────────────────────────────────── */
+[data-testid="stTabs"] [role="tablist"] {
+    background: rgba(30,0,56,0.8) !important;
+    border-radius: 10px !important;
+    padding: 4px !important;
+    border: 1px solid rgba(255,215,0,0.2) !important;
+}
+[data-testid="stTabs"] [role="tab"] {
+    color: #9B6FBF !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+    background: rgba(255,215,0,0.15) !important;
+    color: #FFD700 !important;
+    border: 1px solid rgba(255,215,0,0.4) !important;
+    font-weight: 700 !important;
+}
+
+/* ── FORM ALANLARI ─────────────────────────────────────────── */
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea {
+    background: rgba(30,0,56,0.9) !important;
+    border: 1px solid rgba(255,215,0,0.25) !important;
+    border-radius: 8px !important;
+    color: #F5F0FF !important;
+}
+[data-testid="stTextInput"] input:focus,
+[data-testid="stTextArea"] textarea:focus {
+    border-color: rgba(255,215,0,0.6) !important;
+    box-shadow: 0 0 0 3px rgba(255,215,0,0.1) !important;
+}
+
+/* ── DROPDOWN ──────────────────────────────────────────────── */
+[data-baseweb="popover"],[data-baseweb="popover"] * { background-color: #2D0052 !important; color: #F5F0FF !important; }
+ul[role="listbox"] { background-color: #2D0052 !important; border: 1px solid rgba(255,215,0,0.3) !important; border-radius: 8px !important; }
+li[role="option"] { background-color: #2D0052 !important; color: #E8D5FF !important; }
+li[role="option"]:hover,li[role="option"][aria-selected="true"] { background-color: #4A0080 !important; color: #FFD700 !important; }
+[data-baseweb="menu"] { background-color: #2D0052 !important; border: 1px solid rgba(255,215,0,0.3) !important; border-radius: 8px !important; }
+[data-baseweb="menu"] li { color: #E8D5FF !important; background-color: #2D0052 !important; }
+[data-baseweb="menu"] li:hover { background-color: #4A0080 !important; color: #FFD700 !important; }
+[data-testid="stSelectbox"] [data-baseweb="select"] span,
+[data-testid="stSelectbox"] [data-baseweb="select"] div { color: #F5F0FF !important; background-color: transparent !important; }
+
+/* ── BUTONLAR ──────────────────────────────────────────────── */
+.stButton > button {
+    background: linear-gradient(135deg, #5C0099, #7B00CC) !important;
+    color: #FFD700 !important;
+    border: 1px solid rgba(255,215,0,0.3) !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    transition: all 0.2s !important;
+}
+.stButton > button:hover {
+    background: linear-gradient(135deg, #FFD700, #FFC200) !important;
+    color: #2D0052 !important;
+    border-color: #FFD700 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 16px rgba(255,215,0,0.3) !important;
+}
+[data-testid="stFormSubmitButton"] > button {
+    background: linear-gradient(135deg, #FFD700, #FFC200) !important;
+    color: #2D0052 !important;
+    border: none !important;
+    width: 100% !important;
+    font-weight: 800 !important;
+    border-radius: 10px !important;
+    font-size: 15px !important;
+}
+[data-testid="stFormSubmitButton"] > button:hover {
+    background: linear-gradient(135deg, #E91E8C, #C2185B) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 16px rgba(233,30,140,0.4) !important;
+}
+[data-testid="stDownloadButton"] > button {
+    background: rgba(61,0,102,0.8) !important;
+    border: 1px solid rgba(255,215,0,0.3) !important;
+    color: #FFD700 !important;
+    border-radius: 8px !important;
+}
+
+/* ── TABLO / DATAFRAME ─────────────────────────────────────── */
+[data-testid="stDataFrame"] {
+    border: 1px solid rgba(255,215,0,0.15) !important;
+    border-radius: 12px !important;
+}
+
+/* ── BİLDİRİMLER ───────────────────────────────────────────── */
 [data-testid="stAlert"] { border-radius: 10px !important; border-left-width: 4px !important; }
-[data-testid="stExpander"] { background: rgba(30,41,59,0.5) !important; border: 1px solid rgba(99,179,237,0.12) !important; border-radius: 10px !important; }
-[data-testid="stNumberInput"] input { background: rgba(15,23,42,0.9) !important; border: 1px solid rgba(99,179,237,0.2) !important; border-radius: 8px !important; color: #e2e8f0 !important; }
-hr { border-color: rgba(99,179,237,0.1) !important; }
-.durum-karti { background: rgba(30,41,59,0.7); border: 1px solid rgba(99,179,237,0.15); border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; }
-.kritik-banner { background: linear-gradient(135deg, rgba(220,38,38,0.15), rgba(153,27,27,0.1)); border: 1px solid rgba(220,38,38,0.4); border-left: 4px solid #dc2626; border-radius: 10px; padding: 14px 18px; margin: 8px 0 16px 0; }
+
+/* ── EXPANDER ──────────────────────────────────────────────── */
+[data-testid="stExpander"] {
+    background: rgba(61,0,102,0.5) !important;
+    border: 1px solid rgba(255,215,0,0.15) !important;
+    border-radius: 10px !important;
+}
+[data-testid="stExpander"] summary { color: #FFD700 !important; font-weight: 600 !important; }
+
+/* ── NUMBER INPUT ──────────────────────────────────────────── */
+[data-testid="stNumberInput"] input {
+    background: rgba(30,0,56,0.9) !important;
+    border: 1px solid rgba(255,215,0,0.25) !important;
+    border-radius: 8px !important;
+    color: #F5F0FF !important;
+}
+
+/* ── ÇİZGİ ─────────────────────────────────────────────────── */
+hr { border-color: rgba(255,215,0,0.15) !important; }
+
+/* ── ÖZEL KARTLAR ──────────────────────────────────────────── */
+.durum-karti {
+    background: rgba(61,0,102,0.7);
+    border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+}
+.kritik-banner {
+    background: linear-gradient(135deg, rgba(233,30,140,0.15), rgba(180,0,100,0.1));
+    border: 1px solid rgba(233,30,140,0.5);
+    border-left: 4px solid #E91E8C;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 8px 0 16px 0;
+}
 .sla-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-.sla-ok   { background: rgba(22,163,74,0.15);  border:1px solid rgba(22,163,74,0.4);  color:#4ade80; }
-.sla-warn { background: rgba(220,38,38,0.15);  border:1px solid rgba(220,38,38,0.4);  color:#f87171; }
+.sla-ok   { background: rgba(255,215,0,0.15); border:1px solid rgba(255,215,0,0.4); color:#FFD700; }
+.sla-warn { background: rgba(233,30,140,0.15); border:1px solid rgba(233,30,140,0.4); color:#E91E8C; }
+
+/* ── PROGRESS BAR ──────────────────────────────────────────── */
+[data-testid="stProgress"] > div > div { background: #FFD700 !important; }
+
+/* ── RADIO ─────────────────────────────────────────────────── */
+[data-testid="stRadio"] label { color: #E8D5FF !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -629,7 +766,7 @@ with st.sidebar:
     st.markdown("""
     <div style="padding:20px 8px 8px;">
       <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#3b82f6;margin-bottom:4px;">ENTERPRISE CMMS</div>
-      <div style="font-size:20px;font-weight:800;color:#e2e8f0;line-height:1.2;">TeknikPro<br><span style="color:#3b82f6;">v2.0</span></div>
+      <div style="font-size:20px;font-weight:800;color:#e2e8f0;line-height:1.2;">TeknikPro<br><span style="color:#FFD700;">v2.0</span></div>
       <div style="font-size:11px;color:#475569;margin-top:6px;">TPM & Arıza Yönetim Platformu</div>
     </div>""", unsafe_allow_html=True)
 
@@ -735,150 +872,201 @@ tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_oee, tab_ayar
 # =============================================================================
 
 with tab_pano:
-    col_ref, _ = st.columns([1,6])
-    with col_ref:
-        if st.button("🔄 Yenile", use_container_width=True):
-            ariza_df_getir.clear()
-            st.rerun()
-
-    df = ariza_df_getir()
-
-    if df.empty or "Durum" not in df.columns:
-        col1,col2,col3,col4,col5 = st.columns(5)
-        with col1: st.metric("📋 Toplam Talep",0)
-        with col2: st.metric("🟡 Açık Talepler",0)
-        with col3: st.metric("✅ Kapatılan",0)
-        with col4: st.metric("🔴 Kritik Açık",0)
-        with col5: st.metric("⚠️ SLA Aşımı",0)
-        st.info("📭 Sistemde henüz kayıt bulunmuyor.")
+    # Giriş yapmamışsa kısıtlı görünüm
+    if not st.session_state.get("oturum_acik", False):
+        st.markdown("""
+        <div style="text-align:center;padding:60px 20px;">
+          <div style="font-size:64px;margin-bottom:20px;">🛡️</div>
+          <div style="font-size:22px;font-weight:800;color:#FFD700;margin-bottom:8px;">TeknikPro CMMS v2.0</div>
+          <div style="font-size:14px;color:#C89EE8;margin-bottom:24px;">
+            Enterprise Bakım & Arıza Yönetim Sistemi<br>
+            Adana LM & Tuzla LM
+          </div>
+          <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);
+                      border-radius:12px;padding:24px;max-width:400px;margin:0 auto;">
+            <div style="font-size:32px;margin-bottom:8px;">🔒</div>
+            <div style="font-size:16px;font-weight:700;color:#FFD700;margin-bottom:8px;">
+              Verileri görmek için giriş yapın
+            </div>
+            <div style="font-size:13px;color:#9B6FBF;">
+              Sol paneldeki giriş formunu kullanın
+            </div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        toplam   = len(df)
-        acik     = len(df[df["Durum"]=="Açık"])
-        kapali   = len(df[df["Durum"]=="Kapalı"])
-        kritik   = len(df[(df["Durum"]=="Açık") & (df["Öncelik"].str.startswith("🔴",na=False))])
-        sla_asan = len(df[df["SLA Durumu"].str.contains("Aşıldı",na=False)])
-        bugun    = datetime.now().strftime("%d/%m/%Y")
-        bugun_s  = len(df[df["Açılış Tarihi"].str.startswith(bugun,na=False)]) if "Açılış Tarihi" in df.columns else 0
+        col_ref, _ = st.columns([1,6])
+        with col_ref:
+            if st.button("🔄 Yenile", use_container_width=True):
+                ariza_df_getir.clear()
+                st.rerun()
 
-        col1,col2,col3,col4,col5 = st.columns(5)
-        with col1: st.metric("📋 Toplam Talep", toplam, delta=f"+{bugun_s} bugün")
-        with col2: st.metric("🟡 Açık Talepler", acik)
-        with col3: st.metric("✅ Kapatılan", kapali, delta=f"%{round(kapali/max(toplam,1)*100)}")
-        with col4: st.metric("🔴 Kritik Açık", kritik, delta="acil müdahale" if kritik>0 else "Temiz")
-        with col5: st.metric("⚠️ SLA Aşımı", sla_asan)
+        df = ariza_df_getir()
 
-        st.markdown("---")
-        col_g1,col_g2 = st.columns(2)
-        with col_g1:
-            st.markdown("#### Öncelik Bazlı Açık Talepler")
-            if acik > 0:
-                adf = df[df["Durum"]=="Açık"]
-                oc = adf["Öncelik"].value_counts()
-                oc.index = [i[:30] for i in oc.index]
-                st.bar_chart(oc, height=260)
-            else:
-                st.info("Açık talep yok")
-        with col_g2:
-            st.markdown("#### Makine Bazlı Arıza Sayısı")
-            st.bar_chart(df["Makine"].value_counts().head(8), height=260)
-
-        st.markdown("#### 30 Günlük Arıza Trendi")
-        try:
-            dt = df.copy()
-            dt["Tarih"] = pd.to_datetime(dt["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
-            dt = dt[dt["Tarih"] >= date.today()-timedelta(days=30)]
-            gl = dt.groupby("Tarih").size().rename("Arıza Sayısı")
-            if len(gl) > 0:
-                st.line_chart(gl, height=200)
-        except: pass
-
-        st.markdown("---")
-        st.markdown("#### 🟡 Müdahale Bekleyen Açık Talepler")
-        adf2 = df[df["Durum"]=="Açık"].copy()
-        if adf2.empty:
-            st.success("✅ Açık talep bulunmuyor.")
+        if df.empty or "Durum" not in df.columns:
+            st.info("📭 Sistemde henüz kayıt bulunmuyor.")
         else:
-            kdf = adf2[adf2["Öncelik"].str.startswith("🔴",na=False)]
-            if not kdf.empty:
-                st.markdown(f'''<div class="kritik-banner"><strong style="color:#f87171;">🚨 {len(kdf)} KRİTİK ARIZA acil müdahale bekliyor!</strong></div>''', unsafe_allow_html=True)
+            # ── KPI Hesapla ───────────────────────────────────────────
+            toplam   = len(df)
+            acik     = len(df[df["Durum"]=="Açık"])
+            kapali   = len(df[df["Durum"]=="Kapalı"])
+            kritik   = len(df[(df["Durum"]=="Açık") & (df["Öncelik"].str.startswith("🔴",na=False))])
+            sla_asan = len(df[df["SLA Durumu"].str.contains("Aşıldı",na=False)])
+            bugun    = datetime.now().strftime("%d/%m/%Y")
+            bugun_s  = len(df[df["Açılış Tarihi"].str.startswith(bugun,na=False)]) if "Açılış Tarihi" in df.columns else 0
+            df_kap   = df[df["Durum"]=="Kapalı"].copy()
+            df_kap["sure"] = pd.to_numeric(df_kap.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
+            ort_mttr = round(df_kap["sure"].mean(), 1) if not df_kap.empty else 0
+            toplam_maliyet = pd.to_numeric(df.get("Toplam Maliyet (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0).sum()
+            sla_basari = round((toplam - sla_asan) / max(toplam, 1) * 100, 1)
 
-            # Otomatik bakım talepleri ayrıca uyar
-            if "Bildiren" in adf2.columns:
-                oto_df = adf2[adf2["Bildiren"] == "Sistem (Otomatik)"]
-                if not oto_df.empty:
-                    st.markdown(f"""
-                    <div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.35);
-                                border-left:4px solid #3b82f6;border-radius:10px;padding:12px 16px;margin-bottom:12px;">
-                      🔧 <strong style="color:#93c5fd;">{len(oto_df)} periyodik bakım talebi</strong>
-                      <span style="color:#94a3b8;font-size:12px;"> otomatik açıldı — Bakım Planları sekmesinden kapatın</span>
-                    </div>""", unsafe_allow_html=True)
+            # Availability (son 30 gün)
+            try:
+                son30 = df.copy()
+                son30["_t"] = pd.to_datetime(son30["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
+                son30 = son30[son30["_t"] >= date.today()-timedelta(days=30)]
+                dur_top = son30[son30["Durum"]=="Kapalı"]["sure"].sum() if "sure" in son30.columns else                     pd.to_numeric(son30[son30["Durum"]=="Kapalı"].get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").sum()
+                avail = round(max(0, (30*480 - dur_top) / (30*480) * 100), 1)
+            except:
+                avail = 0
 
-            gs = ["Talep No","Bölge","Öncelik","Açılış Tarihi","Bildiren","Makine","Arıza Türü","Arıza Tanımı","SLA Durumu"]
-            gs = [s for s in gs if s in adf2.columns]
-            st.dataframe(adf2[gs], use_container_width=True, hide_index=True)
+            # ── KPI KARTLAR ───────────────────────────────────────────
+            st.markdown(f"""
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">
+              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;">
+                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">📋 Toplam Talep</div>
+                <div style="font-size:30px;font-weight:800;color:#FFD700;line-height:1;">{toplam}</div>
+                <div style="font-size:11px;color:#4ade80;margin-top:4px;">+{bugun_s} bugün</div>
+              </div>
+              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(233,30,140,0.3);border-radius:10px;padding:14px 16px;">
+                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">🚨 Açık / Kritik</div>
+                <div style="font-size:30px;font-weight:800;color:#E91E8C;line-height:1;">{acik}</div>
+                <div style="font-size:11px;color:#E91E8C;margin-top:4px;">{kritik} kritik acil</div>
+              </div>
+              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;">
+                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">📈 Availability</div>
+                <div style="font-size:30px;font-weight:800;color:{"#4ade80" if avail>=85 else "#FFD700" if avail>=70 else "#E91E8C"};line-height:1;">%{avail}</div>
+                <div style="font-size:11px;color:#9B6FBF;margin-top:4px;">{"Hedef üstü" if avail>=85 else "Geliştirilmeli"}</div>
+              </div>
+              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;">
+                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">⏱ Ort. MTTR</div>
+                <div style="font-size:30px;font-weight:800;color:#FFD700;line-height:1;">{int(ort_mttr)}<span style="font-size:14px;color:#9B6FBF;"> dk</span></div>
+                <div style="font-size:11px;color:#9B6FBF;margin-top:4px;">Ortalama tamir süresi</div>
+              </div>
+              <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;">
+                <div style="font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">💰 Toplam Maliyet</div>
+                <div style="font-size:24px;font-weight:800;color:#FFD700;line-height:1;">{toplam_maliyet:,.0f}<span style="font-size:12px;color:#9B6FBF;"> ₺</span></div>
+                <div style="font-size:11px;color:#9B6FBF;margin-top:4px;">SLA Uyum: %{sla_basari}</div>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # ── Bakım Uyarıları ───────────────────────────────────────────
-        st.markdown("---")
-        st.markdown("#### 🔧 Yaklaşan & Gecikmiş Bakımlar")
-        try:
-            df_bp = bakim_df_getir()
-            if not df_bp.empty and "sonraki_bakim_tarihi" in df_bp.columns:
-                df_bp["_snr"] = pd.to_datetime(df_bp["sonraki_bakim_tarihi"], format="%d/%m/%Y", errors="coerce").dt.date
-                gec_bp = df_bp[df_bp["durum"] == "Gecikmiş"]
-                yak_bp = df_bp[
-                    (df_bp["_snr"] >= date.today()) &
-                    (df_bp["_snr"] <= date.today() + timedelta(days=7)) &
-                    (df_bp["durum"] == "Bekliyor")
-                ]
-                if not gec_bp.empty:
-                    st.error(f"🔴 **{len(gec_bp)} gecikmiş bakım** var! 'Bakım Planları' sekmesinden kontrol edin.")
-                if not yak_bp.empty:
-                    st.warning(f"🟡 Bu hafta **{len(yak_bp)} bakım** planlanmış: {', '.join(yak_bp['makine'].tolist()[:3])}")
-                if gec_bp.empty and yak_bp.empty:
-                    st.success("✅ Yaklaşan veya gecikmiş bakım bulunmuyor.")
-            else:
-                st.caption("Henüz bakım planı eklenmemiş.")
-        except Exception:
-            st.caption("Bakım verileri yüklenemedi.")
+            # ── CHARTS ROW ────────────────────────────────────────────
+            col_g1, col_g2, col_g3 = st.columns(3)
 
-        # ── OEE Özet ─────────────────────────────────────────────────
-        st.markdown("---")
-        st.markdown("#### 📈 Availability Durumu — Son 7 Gün")
-        try:
-            df_oee_p = ariza_df_getir()
-            if not df_oee_p.empty and "Durum" in df_oee_p.columns:
-                df_kap = df_oee_p[df_oee_p["Durum"] == "Kapalı"].copy()
-                df_kap["sure"] = pd.to_numeric(df_kap.get("Çözüm Süresi (Dk)", pd.Series()), errors="coerce").fillna(0)
-                if "Kapatma Tarihi" in df_kap.columns:
-                    df_kap["_t"] = pd.to_datetime(df_kap["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
-                    son7 = df_kap[df_kap["_t"] >= date.today() - timedelta(days=7)]
-                    if not son7.empty:
-                        vardiya_dk = 480
-                        avail_makine = {}
-                        for mak, grp in son7.groupby("Makine"):
-                            toplam_plan = 7 * vardiya_dk
-                            toplam_dur  = grp["sure"].sum()
-                            avail_makine[mak] = round(max(0, (toplam_plan - toplam_dur) / toplam_plan * 100), 1)
-                        ort_av    = round(sum(avail_makine.values()) / len(avail_makine), 1)
-                        en_iyi    = max(avail_makine, key=avail_makine.get)
-                        en_kotu   = min(avail_makine, key=avail_makine.get)
-                        col_oee1, col_oee2, col_oee3 = st.columns(3)
-                        with col_oee1: st.metric("📈 Ort. Availability (7 gün)", f"%{ort_av}",
-                            delta="🏆 Hedef üstü" if ort_av>=90 else "⚠️ Hedefin altında")
-                        with col_oee2: st.metric("🟢 En İyi", en_iyi, delta=f"%{avail_makine[en_iyi]}")
-                        with col_oee3: st.metric("🔴 Geliştirilmeli", en_kotu, delta=f"%{avail_makine[en_kotu]}")
-                    else:
-                        st.caption("Son 7 günde kapatılmış arıza yok.")
+            with col_g1:
+                st.markdown("""<div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);
+                    border-radius:10px;padding:14px;">
+                    <div style="font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:10px;">
+                    📊 Makine Bazlı Arıza</div></div>""", unsafe_allow_html=True)
+                mak_say = df["Makine"].value_counts().head(6)
+                st.bar_chart(mak_say, height=200, use_container_width=True)
+
+            with col_g2:
+                st.markdown("""<div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);
+                    border-radius:10px;padding:14px;">
+                    <div style="font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:10px;">
+                    🔧 Öncelik Dağılımı</div></div>""", unsafe_allow_html=True)
+                if acik > 0:
+                    onc = df[df["Durum"]=="Açık"]["Öncelik"].value_counts()
+                    onc.index = [i[:20] for i in onc.index]
+                    st.bar_chart(onc, height=200, use_container_width=True)
                 else:
-                    st.caption("OEE için arıza kapatma verisi gerekli.")
-            else:
-                st.caption("OEE verisi hesaplanamadı.")
-        except Exception:
-            st.caption("OEE verileri yüklenemedi.")
+                    st.info("Açık talep yok")
 
-# =============================================================================
-# SEKME 2: YENİ TALEP AÇ
-# =============================================================================
+            with col_g3:
+                st.markdown("""<div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);
+                    border-radius:10px;padding:14px;">
+                    <div style="font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:10px;">
+                    📉 30 Günlük Trend</div></div>""", unsafe_allow_html=True)
+                try:
+                    dt2 = df.copy()
+                    dt2["Tarih"] = pd.to_datetime(dt2["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
+                    dt2 = dt2[dt2["Tarih"] >= date.today()-timedelta(days=30)]
+                    gl = dt2.groupby("Tarih").size().rename("Arıza")
+                    if len(gl) > 0:
+                        st.line_chart(gl, height=200, use_container_width=True)
+                except: pass
+
+            st.markdown("---")
+
+            # ── AÇIK TALEPLER ─────────────────────────────────────────
+            st.markdown("#### 🚨 Açık Talepler")
+            adf = df[df["Durum"]=="Açık"].copy()
+            if adf.empty:
+                st.success("✅ Açık talep bulunmuyor.")
+            else:
+                if kritik > 0:
+                    st.markdown(f'''<div class="kritik-banner">
+                        <strong style="color:#E91E8C;">🚨 {kritik} KRİTİK ARIZA acil müdahale bekliyor!</strong>
+                        </div>''', unsafe_allow_html=True)
+                # Otomatik bakım uyarısı
+                if "Bildiren" in adf.columns:
+                    oto = adf[adf["Bildiren"]=="Sistem (Otomatik)"]
+                    if not oto.empty:
+                        st.markdown(f"""<div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);
+                            border-left:4px solid #3b82f6;border-radius:8px;padding:10px 14px;margin-bottom:10px;">
+                            🔧 <strong style="color:#93c5fd;">{len(oto)} periyodik bakım talebi</strong>
+                            <span style="color:#9B6FBF;font-size:12px;"> otomatik açıldı</span></div>""",
+                            unsafe_allow_html=True)
+                gs = [s for s in ["Talep No","Bölge","Öncelik","Açılış Tarihi","Bildiren","Makine","Arıza Tanımı","SLA Durumu"] if s in adf.columns]
+                st.dataframe(adf[gs], use_container_width=True, hide_index=True)
+
+            # ── BAKIM & OEE ÖZET ──────────────────────────────────────
+            st.markdown("---")
+            col_bk, col_oe = st.columns(2)
+
+            with col_bk:
+                st.markdown("#### 🔧 Yaklaşan Bakımlar")
+                try:
+                    df_bp = bakim_df_getir()
+                    if not df_bp.empty and "sonraki_bakim_tarihi" in df_bp.columns:
+                        df_bp["_snr"] = pd.to_datetime(df_bp["sonraki_bakim_tarihi"], format="%d/%m/%Y", errors="coerce").dt.date
+                        gec  = df_bp[df_bp["durum"]=="Gecikmiş"]
+                        yak  = df_bp[(df_bp["_snr"]>=date.today()) & (df_bp["_snr"]<=date.today()+timedelta(days=7)) & (df_bp["durum"]=="Bekliyor")]
+                        if not gec.empty:
+                            st.error(f"🔴 {len(gec)} gecikmiş bakım!")
+                        if not yak.empty:
+                            st.warning(f"🟡 Bu hafta {len(yak)} bakım: {', '.join(yak['makine'].tolist()[:3])}")
+                        if gec.empty and yak.empty:
+                            st.success("✅ Yaklaşan gecikmiş bakım yok.")
+                    else:
+                        st.caption("Bakım planı yok.")
+                except Exception:
+                    st.caption("Yüklenemedi.")
+
+            with col_oe:
+                st.markdown("#### 📈 Availability (Son 7 Gün)")
+                try:
+                    if not df_kap.empty and "Kapatma Tarihi" in df_kap.columns:
+                        df_kap["_t"] = pd.to_datetime(df_kap["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
+                        s7 = df_kap[df_kap["_t"] >= date.today()-timedelta(days=7)]
+                        if not s7.empty:
+                            av_mak = {}
+                            for mak, grp in s7.groupby("Makine"):
+                                av_mak[mak] = round(max(0,(7*480-grp["sure"].sum())/(7*480)*100),1)
+                            ort_av = round(sum(av_mak.values())/len(av_mak),1)
+                            renk = "#4ade80" if ort_av>=90 else "#FFD700" if ort_av>=70 else "#E91E8C"
+                            st.markdown(f"""<div style="text-align:center;padding:16px;">
+                                <div style="font-size:42px;font-weight:800;color:{renk};">%{ort_av}</div>
+                                <div style="font-size:12px;color:#9B6FBF;">{"Hedef üstü" if ort_av>=90 else "Geliştirilmeli"}</div>
+                            </div>""", unsafe_allow_html=True)
+                        else:
+                            st.caption("Son 7 günde veri yok.")
+                    else:
+                        st.caption("Yeterli veri yok.")
+                except Exception:
+                    st.caption("Hesaplanamadı.")
 
 with tab_yeni:
     st.markdown("### ➕ Yeni Arıza Bildirimi Oluştur")
@@ -2736,5 +2924,5 @@ st.markdown("---")
 st.markdown("""
 <div style="text-align:center;padding:8px 0;font-size:11px;color:#334155;">
   TeknikPro CMMS v2.0 &nbsp;·&nbsp; TPM & Arıza Yönetim Platformu &nbsp;·&nbsp;
-  <span style="color:#1d4ed8;">Enterprise Edition</span>
+  <span style="color:#FFD700;">Enterprise Edition</span>
 </div>""", unsafe_allow_html=True)

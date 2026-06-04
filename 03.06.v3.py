@@ -1860,14 +1860,23 @@ with tab_ayar:
                     from urllib.parse import quote
                     qr_url = f"{app_url}/?makine={quote(qr_makine_sec)}&bolge={quote(qr_bolge_sec)}"
 
-                    # QR kodu oluştur
+                    # TinyURL ile kısalt
+                    kisa_url = qr_url
+                    try:
+                        r_tiny = requests.get(f"https://tinyurl.com/api-create.php?url={quote(qr_url, safe='')}", timeout=5)
+                        if r_tiny.ok and r_tiny.text.startswith("http"):
+                            kisa_url = r_tiny.text.strip()
+                    except:
+                        pass
+
+                    # QR kodu oluştur — kısa URL kullan
                     qr = qrcode.QRCode(
                         version=1,
                         error_correction=qrcode.constants.ERROR_CORRECT_H,
                         box_size=8,
                         border=3,
                     )
-                    qr.add_data(qr_url)
+                    qr.add_data(kisa_url)
                     qr.make(fit=True)
                     img = qr.make_image(fill_color="#0f172a", back_color="white")
 
@@ -1877,7 +1886,9 @@ with tab_ayar:
                     buf.seek(0)
 
                     st.image(buf, caption=f"{qr_makine_sec} — {qr_bolge_sec}", width=200)
-                    st.caption(f"URL: `{qr_url}`")
+                    st.caption(f"Kısa URL: `{kisa_url}`")
+                    if kisa_url != qr_url:
+                        st.success("✅ TinyURL kısa link oluşturuldu!")
 
                     buf.seek(0)
                     st.download_button(
@@ -1899,6 +1910,13 @@ with tab_ayar:
                         for bolge, mak_listesi in tum_mak.items():
                             for mak in mak_listesi:
                                 url_m = f"{app_url}/?makine={quote(mak)}&bolge={quote(bolge)}"
+                                # TinyURL ile kısalt
+                                try:
+                                    r_t = requests.get(f"https://tinyurl.com/api-create.php?url={quote(url_m, safe='')}", timeout=5)
+                                    if r_t.ok and r_t.text.startswith("http"):
+                                        url_m = r_t.text.strip()
+                                except:
+                                    pass
                                 qr_m  = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=8, border=3)
                                 qr_m.add_data(url_m)
                                 qr_m.make(fit=True)

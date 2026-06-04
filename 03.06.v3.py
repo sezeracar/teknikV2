@@ -668,18 +668,43 @@ with st.sidebar:
 
 sidebar_giris()
 
+# ── Sidebar QR Kod Girişi ─────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("<div style='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#475569;padding-left:4px;margin-bottom:8px;'>📱 HIZLI ARIZA BİLDİRİM</div>", unsafe_allow_html=True)
+    qr_kod_giris = st.text_input(
+        "Makine Kodu Gir",
+        placeholder="Örn: VNA2",
+        help="Makine üzerindeki kodu yazın",
+        key="sidebar_qr_kod"
+    ).strip().upper()
+    if qr_kod_giris:
+        try:
+            qr_rows = sb_select("qr_kodlar", f"kod=eq.{qr_kod_giris}&aktif=eq.true")
+            if qr_rows:
+                st.session_state["qr_makine"] = qr_rows[0]["makine"]
+                st.session_state["qr_bolge"]  = qr_rows[0]["bolge"]
+                st.success(f"✅ {qr_rows[0]['makine']}")
+                st.session_state["goto_yeni_talep"] = True
+            else:
+                st.error("❌ Kod bulunamadı")
+                st.session_state["qr_makine"] = ""
+                st.session_state["qr_bolge"]  = ""
+        except:
+            pass
+
+
 st.markdown("""
 <div style="margin-bottom:24px;">
   <h1 style="margin:0;padding:0;">🛡️ Teknik Bakım & Arıza Yönetim Sistemi</h1>
   <p style="color:#475569;font-size:13px;margin-top:4px;">Computerized Maintenance Management System — Endüstriyel TPM Platformu</p>
 </div>""", unsafe_allow_html=True)
 
-# QR parametresi varsa Yeni Talep sekmesini varsayılan yap
-_qr_check = st.query_params.get("makine", "")
-_default_tab = 1 if _qr_check else 0
+# QR kod veya session state'ten sekme yönlendirmesi
+_qr_check = st.session_state.get("goto_yeni_talep", False)
 
 if _qr_check:
-    # JavaScript ile "Yeni Talep Aç" sekmesine otomatik tıkla
+    st.session_state["goto_yeni_talep"] = False
     components.html("""
     <script>
     setTimeout(function() {
@@ -690,7 +715,7 @@ if _qr_check:
                 break;
             }
         }
-    }, 800);
+    }, 500);
     </script>
     """, height=0)
 
@@ -859,24 +884,21 @@ with tab_yeni:
     else:
         st.session_state["_talep_gonderildi"] = False
 
-    # QR koddan gelen URL parametrelerini oku
+    # QR koddan gelen makine/bölge bilgisini session state'ten oku
     import base64, json as _json
     qr_params = st.query_params
-    qr_makine = ""
-    qr_bolge  = ""
-    try:
-        d = qr_params.get("d", "")
-        if d:
-            veri = _json.loads(base64.urlsafe_b64decode(d + "==").decode())
-            qr_makine = veri.get("makine", "")
-            qr_bolge  = veri.get("bolge", "")
-        else:
-            # Eski format desteği
-            qr_makine = qr_params.get("makine", "")
-            qr_bolge  = qr_params.get("bolge", "")
-    except:
-        qr_makine = qr_params.get("makine", "")
-        qr_bolge  = qr_params.get("bolge", "")
+    qr_makine = st.session_state.get("qr_makine", "")
+    qr_bolge  = st.session_state.get("qr_bolge", "")
+    # Eski URL parametre desteği
+    if not qr_makine:
+        try:
+            d = qr_params.get("d", "")
+            if d:
+                veri = _json.loads(base64.urlsafe_b64decode(d + "==").decode())
+                qr_makine = veri.get("makine", "")
+                qr_bolge  = veri.get("bolge", "")
+        except:
+            pass
 
     # Bölge varsayılanı — QR'dan geldiyse onu seç
     bolge_index  = 0
@@ -1956,116 +1978,108 @@ with tab_ayar:
                 st.info(f"Log yüklenemedi: {e}")
 
             st.markdown("---")
-            st.markdown("#### 📱 QR Kod Üretici")
-            st.caption("Her makine için QR kod oluşturun — operatörler okutunca arıza formu otomatik açılır.")
+            st.markdown("#### 📱 QR Kod & Makine Kodu Yönetimi")
+            st.caption("Her makine için benzersiz kod atayın. Operatörler sidebar'daki kutuya kodu girerek hızlı arıza bildirimi yapabilir.")
 
             try:
-                import qrcode
-                import io
+                import qrcode, io
 
-                # Uygulama URL'sini al
-                try:
-                    app_url = st.secrets.get("app_url", "https://teknikv2.streamlit.app")
-                except:
-                    app_url = "https://teknikv2.streamlit.app"
+                qr_rows_mevcut = sb_select("qr_kodlar", "aktif=eq.true")
+                col_qr_list, col_qr_form = st.columns([3, 2])
 
-                col_qr1, col_qr2 = st.columns(2)
-                with col_qr1:
-                    qr_bolge_sec  = st.selectbox("Bölge", BOLGELER, key="qr_bolge")
-                    qr_makine_sec = st.selectbox("Makine",
-                        aktif_makine_listesi().get(qr_bolge_sec, MAKINE_LISTESI_BOLGE[qr_bolge_sec]),
-                        key="qr_makine")
+                with col_qr_list:
+                    st.markdown("**Tanımlı Makine Kodları**")
+                    if qr_rows_mevcut:
+                        df_qr = pd.DataFrame(qr_rows_mevcut)[["kod","bolge","makine"]]
+                        df_qr.columns = ["Kod","Bölge","Makine"]
+                        st.dataframe(df_qr, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("Henüz makine kodu tanımlanmamış.")
 
-                with col_qr2:
-                    # Hash fragment kullan — Streamlit ? parametrelerini blokluyor
-                    from urllib.parse import quote
-                    # Makine ve bölge bilgisini base64 encode et
-                    import base64, json
-                    veri = json.dumps({"makine": qr_makine_sec, "bolge": qr_bolge_sec})
-                    encoded = base64.urlsafe_b64encode(veri.encode()).decode()
-                    qr_url  = f"{app_url}/?d={encoded}"
+                with col_qr_form:
+                    st.markdown("**Yeni Makine Kodu Ekle**")
+                    with st.form("qr_ekle_form"):
+                        qr_b = st.selectbox("Bölge", BOLGELER, key="qr_b")
+                        qr_m = st.selectbox("Makine",
+                            aktif_makine_listesi().get(qr_b, MAKINE_LISTESI_BOLGE[qr_b]),
+                            key="qr_m")
+                        otomatik_kod = "".join([k for k in qr_m.upper() if k.isalnum()])[:6]
+                        qr_kod_yeni  = st.text_input("Makine Kodu (max 6 hane)",
+                            value=otomatik_kod, placeholder="Örn: VNA2").strip().upper()
+                        if st.form_submit_button("💾 Kod Ekle", use_container_width=True) and qr_kod_yeni:
+                            mevcut_kod = sb_select("qr_kodlar", f"kod=eq.{qr_kod_yeni}")
+                            if mevcut_kod:
+                                st.error(f"❌ Bu kod zaten var!")
+                            else:
+                                sb_insert("qr_kodlar", {"kod": qr_kod_yeni, "bolge": qr_b, "makine": qr_m, "aktif": True})
+                                log_yaz("QR KOD EKLENDİ", f"{qr_kod_yeni} → {qr_m}")
+                                st.success(f"✅ {qr_kod_yeni} eklendi!")
+                                time.sleep(0.5)
+                                st.rerun()
 
-                    # TinyURL ile kısalt
-                    kisa_url = qr_url
-                    try:
-                        r_tiny = requests.get(
-                            f"https://tinyurl.com/api-create.php?url={quote(qr_url, safe='')}",
-                            timeout=5
-                        )
-                        if r_tiny.ok and r_tiny.text.startswith("http"):
-                            kisa_url = r_tiny.text.strip().replace(
-                                "tinyurl.com/preview/deprecated/",
-                                "tinyurl.com/"
-                            )
-                    except:
-                        pass
+                if qr_rows_mevcut:
+                    st.markdown("---")
+                    st.markdown("**QR Kod ve Makine Etiketi**")
+                    col_qr1, col_qr2 = st.columns(2)
+                    with col_qr1:
+                        sec_kod = st.selectbox("Kod Seç",
+                            [f"{r['kod']} — {r['makine']}" for r in qr_rows_mevcut], key="qr_sec")
+                        sec_kod_val = sec_kod.split(" — ")[0]
+                        sec_row = next(r for r in qr_rows_mevcut if r["kod"] == sec_kod_val)
 
-                    # QR kodu oluştur — kısa URL kullan
-                    qr = qrcode.QRCode(
-                        version=1,
-                        error_correction=qrcode.constants.ERROR_CORRECT_H,
-                        box_size=8,
-                        border=3,
-                    )
-                    qr.add_data(kisa_url)
-                    qr.make(fit=True)
-                    img = qr.make_image(fill_color="#0f172a", back_color="white")
+                    with col_qr2:
+                        try:
+                            app_url = st.secrets.get("app_url", "https://teknikv2-78qrqxtnuqyue3bvmk69e2.streamlit.app")
+                        except:
+                            app_url = "https://teknikv2-78qrqxtnuqyue3bvmk69e2.streamlit.app"
 
-                    # BytesIO'ya kaydet
-                    buf = io.BytesIO()
-                    img.save(buf, format="PNG")
-                    buf.seek(0)
+                        # QR içine parametresiz URL — Streamlit bloklayamaz
+                        qr_img = qrcode.QRCode(version=1,
+                            error_correction=qrcode.constants.ERROR_CORRECT_H,
+                            box_size=10, border=3)
+                        qr_img.add_data(app_url)
+                        qr_img.make(fit=True)
+                        img = qr_img.make_image(fill_color="#0f172a", back_color="white")
+                        buf = io.BytesIO()
+                        img.save(buf, format="PNG")
+                        buf.seek(0)
+                        st.image(buf, width=160, caption=f"Kod: {sec_row['kod']}")
+                        buf.seek(0)
+                        st.download_button(f"📥 QR İndir — {sec_row['kod']}",
+                            data=buf.read(),
+                            file_name=f"qr_{sec_row['kod']}.png",
+                            mime="image/png", use_container_width=True)
 
-                    st.image(buf, caption=f"{qr_makine_sec} — {qr_bolge_sec}", width=200)
-                    st.caption(f"Kısa URL: `{kisa_url}`")
-                    if kisa_url != qr_url:
-                        st.success("✅ TinyURL kısa link oluşturuldu!")
+                    # Yazdırılabilir etiket
+                    st.markdown(f"""
+                    <div style="background:white;border:3px solid #0f172a;border-radius:12px;
+                                padding:20px;text-align:center;max-width:280px;color:#0f172a;margin-top:12px;">
+                      <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;color:#64748b;">TeknikPro CMMS</div>
+                      <div style="font-size:15px;font-weight:700;margin:6px 0 2px;color:#1e293b;">{sec_row["makine"]}</div>
+                      <div style="font-size:11px;color:#64748b;margin-bottom:10px;">{sec_row["bolge"]}</div>
+                      <div style="background:#0f172a;color:white;border-radius:8px;padding:10px 20px;
+                                  font-size:32px;font-weight:900;letter-spacing:0.2em;">{sec_row["kod"]}</div>
+                      <div style="font-size:10px;color:#94a3b8;margin-top:8px;">
+                        1. QR kodu okutun veya siteye gidin<br>
+                        2. Sidebar'a bu kodu girin: <strong>{sec_row["kod"]}</strong>
+                      </div>
+                    </div>""", unsafe_allow_html=True)
 
-                    buf.seek(0)
-                    st.download_button(
-                        f"📥 QR İndir — {qr_makine_sec}",
-                        data=buf.read(),
-                        file_name=f"qr_{qr_makine_sec.replace(' ','_')}_{qr_bolge_sec.replace(' ','_')}.png",
-                        mime="image/png",
-                        use_container_width=True
-                    )
-
-                # Toplu QR — tüm makineler
-                st.markdown("---")
-                st.markdown("**Tüm Makineler İçin Toplu QR İndir**")
-                if st.button("🖨️ Tüm QR Kodlarını Oluştur", use_container_width=False):
-                    tum_mak = aktif_makine_listesi()
-                    zip_buf = io.BytesIO()
-                    import zipfile
-                    with zipfile.ZipFile(zip_buf, "w") as zf:
-                        for bolge, mak_listesi in tum_mak.items():
-                            for mak in mak_listesi:
-                                url_m = f"{app_url}/?makine={quote(mak)}&bolge={quote(bolge)}"
-                                # TinyURL ile kısalt
-                                try:
-                                    r_t = requests.get(f"https://tinyurl.com/api-create.php?url={quote(url_m, safe='')}", timeout=5)
-                                    if r_t.ok and r_t.text.startswith("http"):
-                                        url_m = r_t.text.strip()
-                                except:
-                                    pass
-                                qr_m  = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=8, border=3)
-                                qr_m.add_data(url_m)
-                                qr_m.make(fit=True)
-                                img_m = qr_m.make_image(fill_color="#0f172a", back_color="white")
-                                img_buf = io.BytesIO()
-                                img_m.save(img_buf, format="PNG")
-                                dosya_adi = f"{bolge.replace(' ','_').replace('/','_')}/{mak.replace(' ','_')}.png"
-                                zf.writestr(dosya_adi, img_buf.getvalue())
-                    zip_buf.seek(0)
-                    st.download_button(
-                        "📦 Tüm QR Kodlarını İndir (ZIP)",
-                        data=zip_buf.read(),
-                        file_name=f"qr_kodlar_{datetime.now().strftime('%Y%m%d')}.zip",
-                        mime="application/zip"
-                    )
+                    # Sil
+                    if yetkili_mi("Yönetici"):
+                        st.markdown("---")
+                        col_qs1, col_qs2 = st.columns([3,1])
+                        with col_qs1:
+                            sil_kod = st.selectbox("Silinecek",
+                                [f"{r['kod']} — {r['makine']}" for r in qr_rows_mevcut], key="qr_sil")
+                        with col_qs2:
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            if st.button("🗑️ Sil", key="qr_sil_btn"):
+                                sb_update("qr_kodlar", f"kod=eq.{sil_kod.split(' — ')[0]}", {"aktif": False})
+                                st.success("Silindi!"); st.rerun()
 
             except ImportError:
-                st.warning("⚠️ qrcode kütüphanesi yüklenmemiş. requirements.txt güncellendikten sonra çalışır.")
+                st.warning("⚠️ qrcode kütüphanesi yüklenmemiş.")
 
             st.markdown("---")
             st.markdown("#### 📧 Email Bildirim Ayarları")

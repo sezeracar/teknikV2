@@ -2985,9 +2985,19 @@ with tab_ai:
         else:
             # API key kontrolü
             try:
-                api_key = st.secrets["anthropic_api_key"]
+                # Farklı konumlardan okumayı dene
+                api_key = ""
+                try:
+                    api_key = st.secrets["anthropic_api_key"]
+                except:
+                    pass
+                if not api_key:
+                    try:
+                        api_key = st.secrets["email"]["anthropic_api_key"]
+                    except:
+                        pass
                 if not api_key or not api_key.startswith("sk-"):
-                    raise KeyError
+                    raise KeyError("API key bulunamadı")
                 st.success("✅ Claude API bağlantısı hazır.")
             except KeyError:
                 st.error("❌ Anthropic API key bulunamadı. Streamlit Secrets'a `anthropic_api_key` ekleyin.")

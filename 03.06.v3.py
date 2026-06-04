@@ -861,10 +861,10 @@ if _goto_yeni:
     </script>
     """, height=0)
 
-tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_oee, tab_ayar = st.tabs([
+tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_oee, tab_ai, tab_ayar = st.tabs([
     "📊 Canlı Pano","➕ Yeni Talep Aç","✅ Talep Kapat",
     "📋 Raporlama & Arşiv","📦 Stok Yönetimi","🔧 Bakım Planları",
-    "📈 OEE Analizi","⚙️ Sistem Ayarları"
+    "📈 OEE Analizi","🤖 AI Tahmin","⚙️ Sistem Ayarları"
 ])
 
 # =============================================================================
@@ -2964,6 +2964,200 @@ with tab_oee:
                         df_ozet.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
                         file_name=f"oee_raporu_{datetime.now().strftime('%Y%m%d')}.csv",
                         mime="text/csv")
+
+# =============================================================================
+# FOOTER
+# =============================================================================
+# SEKME: AI TAHMİN MOTORU
+# =============================================================================
+
+with tab_ai:
+    if not giris_gerektir("Yönetici"):
+        pass
+    else:
+        st.markdown("### 🤖 AI Arıza Tahmin & Analiz Motoru")
+        st.caption("Geçmiş arıza verilerini Claude AI ile analiz eder — risk tahminleri, kök neden analizi ve aksiyon önerileri üretir.")
+
+        df_ai = ariza_df_getir()
+
+        if df_ai.empty or len(df_ai) < 5:
+            st.warning("⚠️ AI analizi için en az 5 kapatılmış arıza kaydı gerekli.")
+        else:
+            # API key kontrolü
+            try:
+                api_key = st.secrets["anthropic_api_key"]
+                if not api_key or not api_key.startswith("sk-"):
+                    raise KeyError
+                st.success("✅ Claude API bağlantısı hazır.")
+            except KeyError:
+                st.error("❌ Anthropic API key bulunamadı. Streamlit Secrets'a `anthropic_api_key` ekleyin.")
+                st.stop()
+
+            # Analiz seçenekleri
+            col_ai1, col_ai2 = st.columns([2, 1])
+
+            with col_ai2:
+                st.markdown("#### ⚙️ Analiz Ayarları")
+                ai_bolge = st.selectbox("Bölge", ["Tümü"] + BOLGELER, key="ai_bolge")
+                ai_gun   = st.selectbox("Dönem", ["Son 30 Gün", "Son 90 Gün", "Tüm Zamanlar"], key="ai_gun")
+                ai_tip   = st.selectbox("Analiz Tipi", [
+                    "🔮 Makine Risk Analizi",
+                    "📊 Arıza Trend Analizi",
+                    "👨‍🔧 Teknisyen Performans Değerlendirmesi",
+                    "💡 Bakım Optimizasyon Önerileri",
+                    "🎯 Genel Sistem Sağlık Raporu"
+                ], key="ai_tip")
+
+                analiz_btn = st.button("🚀 AI Analizi Başlat", use_container_width=True, key="ai_btn")
+
+            with col_ai1:
+                st.markdown("#### 📋 Analiz Kapsamı")
+
+                # Veri filtrele
+                gun_map = {"Son 30 Gün": 30, "Son 90 Gün": 90, "Tüm Zamanlar": 3650}
+                df_fil = df_ai.copy()
+                if ai_bolge != "Tümü" and "Bölge" in df_fil.columns:
+                    df_fil = df_fil[df_fil["Bölge"] == ai_bolge]
+                try:
+                    df_fil["_t"] = pd.to_datetime(df_fil["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
+                    df_fil = df_fil[df_fil["_t"] >= date.today() - timedelta(days=gun_map[ai_gun])]
+                except: pass
+
+                df_kap_ai = df_fil[df_fil["Durum"] == "Kapalı"].copy()
+                df_kap_ai["sure"] = pd.to_numeric(df_kap_ai.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
+
+                col_s1, col_s2, col_s3 = st.columns(3)
+                with col_s1: st.metric("📋 Toplam Kayıt", len(df_fil))
+                with col_s2: st.metric("✅ Kapatılmış", len(df_kap_ai))
+                with col_s3: st.metric("🏭 Farklı Makine", df_fil["Makine"].nunique() if "Makine" in df_fil.columns else 0)
+
+                # Mevcut sonuç alanı
+                if "ai_sonuc" not in st.session_state:
+                    st.session_state["ai_sonuc"] = ""
+                if "ai_tip_sonuc" not in st.session_state:
+                    st.session_state["ai_tip_sonuc"] = ""
+
+            # Analiz butonu
+            if analiz_btn:
+                if len(df_kap_ai) < 3:
+                    st.warning("⚠️ Seçilen dönemde yeterli kapatılmış arıza yok.")
+                else:
+                    # Veri özetini hazırla
+                    mak_ozet = df_kap_ai.groupby("Makine").agg(
+                        ariza_sayi=("Makine","count"),
+                        ort_sure=("sure","mean"),
+                        toplam_sure=("sure","sum")
+                    ).round(1).reset_index()
+
+                    tur_ozet = df_kap_ai["Arıza Türü"].value_counts().head(5).to_dict() if "Arıza Türü" in df_kap_ai.columns else {}
+                    tek_ozet = df_kap_ai["Müdahale Eden"].value_counts().head(5).to_dict() if "Müdahale Eden" in df_kap_ai.columns else {}
+                    sla_asan = len(df_kap_ai[df_kap_ai["SLA Durumu"].str.contains("Aşıldı", na=False)]) if "SLA Durumu" in df_kap_ai.columns else 0
+
+                    # Prompt hazırla
+                    tip_prompt = {
+                        "🔮 Makine Risk Analizi": "Her makine için arıza risk seviyesini (Düşük/Orta/Yüksek/Kritik) belirle. En riskli 3 makineyi öncelikli öner. Her biri için somut önleyici bakım aksiyonu ver.",
+                        "📊 Arıza Trend Analizi": "Arıza trendlerini analiz et. Hangi arıza türleri artıyor? Mevsimsel pattern var mı? Gelecek 30 günde hangi sorunlar beklenmeli?",
+                        "👨‍🔧 Teknisyen Performans Değerlendirmesi": "Teknisyen verilerini analiz et. Kim en verimli? Kim desteklenebilir? İş yükü dengeli mi? Somut öneriler ver.",
+                        "💡 Bakım Optimizasyon Önerileri": "Mevcut bakım stratejisini değerlendir. Reaktif mi, önleyici mi? Hangi makinelere periyodik bakım eklenmeli? Maliyet optimizasyonu için ne yapılmalı?",
+                        "🎯 Genel Sistem Sağlık Raporu": "Tesisin genel bakım sağlığını değerlendir. Güçlü yanlar, zayıf yanlar, acil aksiyonlar ve uzun vadeli öneriler ver. Yönetici özeti formatında sun."
+                    }
+
+                    prompt = f"""Sen endüstriyel bakım yönetimi (CMMS) konusunda uzman bir AI danışmansın. 
+Türkçe yanıt ver. Veriler Türkiye'deki bir lojistik/depo tesisine ait.
+
+## Tesis Bilgisi
+- Bölge: {ai_bolge}
+- Analiz Dönemi: {ai_gun}
+- Toplam Kapatılmış Arıza: {len(df_kap_ai)}
+- SLA Aşımı: {sla_asan} arıza
+
+## Makine Bazlı Arıza Özeti
+{mak_ozet.to_string(index=False)}
+
+## En Sık Arıza Türleri
+{chr(10).join([f"- {k}: {v} arıza" for k,v in tur_ozet.items()])}
+
+## Teknisyen Dağılımı
+{chr(10).join([f"- {k}: {v} arıza" for k,v in tek_ozet.items()])}
+
+## Görevin
+{tip_prompt.get(ai_tip, "Genel analiz yap.")}
+
+Yanıtını şu formatta ver:
+1. **Özet Değerlendirme** (2-3 cümle)
+2. **Kritik Bulgular** (madde madde, maksimum 5)
+3. **Acil Aksiyonlar** (öncelik sırasına göre, maksimum 3)
+4. **Uzun Vadeli Öneriler** (maksimum 3)
+5. **Risk Skoru** (0-100 arası, 100=en riskli)
+
+Somut, uygulanabilir ve veriye dayalı yanıt ver."""
+
+                    with st.spinner("🤖 Claude AI analiz yapıyor..."):
+                        try:
+                            resp = requests.post(
+                                "https://api.anthropic.com/v1/messages",
+                                headers={
+                                    "x-api-key": api_key,
+                                    "anthropic-version": "2023-06-01",
+                                    "content-type": "application/json"
+                                },
+                                json={
+                                    "model": "claude-haiku-4-5-20251001",
+                                    "max_tokens": 1500,
+                                    "messages": [{"role": "user", "content": prompt}]
+                                },
+                                timeout=30
+                            )
+                            if resp.ok:
+                                sonuc = resp.json()["content"][0]["text"]
+                                st.session_state["ai_sonuc"] = sonuc
+                                st.session_state["ai_tip_sonuc"] = ai_tip
+                                log_yaz("AI ANALİZ", f"{ai_tip} — {ai_bolge} — {ai_gun}")
+                            else:
+                                st.error(f"❌ API Hatası {resp.status_code}: {resp.text[:200]}")
+                        except Exception as e:
+                            st.error(f"❌ Bağlantı hatası: {e}")
+
+            # Sonuç göster
+            if st.session_state.get("ai_sonuc"):
+                st.markdown("---")
+                st.markdown(f"""
+                <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
+                            border-left:4px solid #FFD700;border-radius:10px;padding:16px;margin-bottom:16px;">
+                  <div style="font-size:11px;color:#9B6FBF;font-weight:700;text-transform:uppercase;margin-bottom:8px;">
+                    🤖 Claude AI Analiz Sonucu — {st.session_state.get("ai_tip_sonuc","")}
+                  </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.markdown(st.session_state["ai_sonuc"])
+
+                col_dl, col_yeni = st.columns([1,3])
+                with col_dl:
+                    st.download_button(
+                        "📥 Raporu İndir",
+                        data=st.session_state["ai_sonuc"].encode("utf-8"),
+                        file_name=f"ai_rapor_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                        mime="text/plain"
+                    )
+                with col_yeni:
+                    if st.button("🔄 Yeni Analiz", key="ai_temizle"):
+                        st.session_state["ai_sonuc"] = ""
+                        st.rerun()
+
+            elif not analiz_btn:
+                st.markdown("""
+                <div style="text-align:center;padding:40px;background:rgba(61,0,102,0.4);
+                            border:1px solid rgba(255,215,0,0.1);border-radius:12px;">
+                  <div style="font-size:48px;margin-bottom:12px;">🤖</div>
+                  <div style="font-size:16px;font-weight:700;color:#FFD700;margin-bottom:8px;">
+                    AI Analizi Hazır
+                  </div>
+                  <div style="font-size:13px;color:#9B6FBF;">
+                    Sağdaki seçeneklerden analiz tipini seçin ve "AI Analizi Başlat" butonuna basın.
+                  </div>
+                </div>
+                """, unsafe_allow_html=True)
 
 # =============================================================================
 # FOOTER

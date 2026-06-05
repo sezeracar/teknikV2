@@ -789,61 +789,67 @@ hr { border-color: rgba(255,215,0,0.15) !important; }
 
 /* ── MOBİL OPTİMİZASYON ────────────────────────────────────── */
 @media (max-width: 768px) {
+    /* Genel padding azalt */
+    .main .block-container { padding: 8px 12px !important; }
+
     /* Butonlar büyük ve tıklanabilir */
     .stButton > button {
-        min-height: 52px !important;
+        min-height: 48px !important;
         font-size: 15px !important;
-        padding: 14px 20px !important;
+        padding: 12px 16px !important;
     }
     [data-testid="stFormSubmitButton"] > button {
-        min-height: 56px !important;
+        min-height: 52px !important;
         font-size: 16px !important;
-        padding: 16px !important;
+        font-weight: 800 !important;
+        padding: 14px !important;
     }
-    /* Input alanları büyük */
+    /* Input alanları */
     [data-testid="stTextInput"] input {
-        min-height: 48px !important;
+        min-height: 44px !important;
         font-size: 16px !important;
-        padding: 12px !important;
+        padding: 10px 12px !important;
     }
     [data-testid="stTextArea"] textarea {
-        font-size: 16px !important;
-        padding: 12px !important;
+        font-size: 15px !important;
+        padding: 10px 12px !important;
     }
-    /* Selectbox büyük */
+    /* Selectbox kompakt */
     [data-testid="stSelectbox"] > div > div {
-        min-height: 48px !important;
+        min-height: 44px !important;
         font-size: 15px !important;
     }
-    /* Number input büyük */
-    [data-testid="stNumberInput"] input {
-        min-height: 48px !important;
-        font-size: 16px !important;
-    }
-    /* Time input büyük */
+    /* Number & time input */
+    [data-testid="stNumberInput"] input,
     [data-testid="stTimeInput"] input {
-        min-height: 48px !important;
+        min-height: 44px !important;
         font-size: 16px !important;
     }
-    /* Kolonlar mobilde alt alta */
-    [data-testid="column"] {
-        min-width: 100% !important;
-    }
-    /* Metrikler büyük */
-    [data-testid="metric-container"] [data-testid="stMetricValue"] {
-        font-size: 22px !important;
+    /* Başlık küçült */
+    h1 { font-size: 18px !important; margin-bottom: 4px !important; }
+    h2 { font-size: 16px !important; }
+    h3 { font-size: 15px !important; }
+    h4 { font-size: 14px !important; }
+    /* Boşlukları azalt */
+    [data-testid="stVerticalBlock"] > div {
+        gap: 6px !important;
     }
     /* Tab yazıları küçük */
     [data-testid="stTabs"] [role="tab"] {
-        font-size: 11px !important;
-        padding: 6px 10px !important;
+        font-size: 10px !important;
+        padding: 5px 8px !important;
     }
-    /* Başlık küçült */
-    h1 { font-size: 20px !important; }
-    /* KPI grid tek kolon */
-    .kpi-grid-mobile {
-        grid-template-columns: repeat(2, 1fr) !important;
+    /* Metrikler kompakt */
+    [data-testid="metric-container"] {
+        padding: 10px 12px !important;
     }
+    [data-testid="metric-container"] [data-testid="stMetricValue"] {
+        font-size: 20px !important;
+    }
+    /* Form alanı label küçük */
+    label { font-size: 12px !important; margin-bottom: 2px !important; }
+    /* Caption */
+    [data-testid="stCaptionContainer"] p { font-size: 11px !important; }
 }
 </style>
 """, unsafe_allow_html=True)

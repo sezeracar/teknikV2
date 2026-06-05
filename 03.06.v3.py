@@ -796,47 +796,73 @@ hr { border-color: rgba(255,215,0,0.15) !important; }
     p, span, div, li { color: #F0E8FF !important; font-size: 14px !important; }
     label { color: #FFD700 !important; font-size: 13px !important; font-weight: 600 !important; margin-bottom: 4px !important; }
 
-    /* Input kutucukları — arka plan + border + yazı */
-    [data-testid="stTextInput"] > div,
-    [data-testid="stTextInput"] input {
+    /* Input kutucukları — sadece dış wrapper'a border, iç elemana yok */
+    [data-testid="stTextInput"] > div {
         background: rgba(30,0,56,0.95) !important;
         border: 2px solid rgba(255,215,0,0.5) !important;
         border-radius: 10px !important;
+    }
+    [data-testid="stTextInput"] input {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
         min-height: 44px !important;
         font-size: 16px !important;
         color: #FFFFFF !important;
         padding: 10px 12px !important;
     }
-    [data-testid="stTextArea"] > div,
-    [data-testid="stTextArea"] textarea {
+    [data-testid="stTextArea"] > div {
         background: rgba(30,0,56,0.95) !important;
         border: 2px solid rgba(255,215,0,0.5) !important;
         border-radius: 10px !important;
+    }
+    [data-testid="stTextArea"] textarea {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
         font-size: 15px !important;
         color: #FFFFFF !important;
         padding: 10px 12px !important;
     }
-    /* Selectbox kutucuk */
-    [data-testid="stSelectbox"] > div,
+    /* Selectbox — sadece dış wrapper */
     [data-testid="stSelectbox"] > div > div {
         background: rgba(30,0,56,0.95) !important;
         border: 2px solid rgba(255,215,0,0.5) !important;
         border-radius: 10px !important;
         min-height: 44px !important;
-        font-size: 15px !important;
-        color: #FFFFFF !important;
+    }
+    [data-testid="stSelectbox"] > div > div > div {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
     }
     [data-testid="stSelectbox"] span,
     [data-testid="stSelectbox"] p { color: #FFFFFF !important; font-size: 15px !important; }
 
-    /* Number & time input */
-    [data-testid="stNumberInput"] > div,
-    [data-testid="stNumberInput"] input,
-    [data-testid="stTimeInput"] > div,
-    [data-testid="stTimeInput"] input {
+    /* Number input */
+    [data-testid="stNumberInput"] > div {
         background: rgba(30,0,56,0.95) !important;
         border: 2px solid rgba(255,215,0,0.5) !important;
         border-radius: 10px !important;
+    }
+    [data-testid="stNumberInput"] input {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        min-height: 44px !important;
+        font-size: 16px !important;
+        color: #FFFFFF !important;
+    }
+    /* Time input */
+    [data-testid="stTimeInput"] > div {
+        background: rgba(30,0,56,0.95) !important;
+        border: 2px solid rgba(255,215,0,0.5) !important;
+        border-radius: 10px !important;
+    }
+    [data-testid="stTimeInput"] input {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
         min-height: 44px !important;
         font-size: 16px !important;
         color: #FFFFFF !important;

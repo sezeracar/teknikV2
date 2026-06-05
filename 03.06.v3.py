@@ -1983,6 +1983,187 @@ with tab_rapor:
             except Exception as e:
                 st.caption(f"Teknisyen analizi yüklenemedi: {e}")
 
+            # ── Vardiya Bazlı Analiz ───────────────────────────────────
+            st.markdown("---")
+            st.markdown("#### 🌙 Vardiya Bazlı Arıza Analizi")
+            try:
+                if not df_r.empty and "Vardiya" in df_r.columns:
+                    df_v = df_r.copy()
+                    vardiya_ozet = []
+                    for vardiya, grp in df_v.groupby("Vardiya"):
+                        kapat = grp[grp["Durum"]=="Kapalı"].copy()
+                        kapat["sure"] = pd.to_numeric(kapat.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
+                        kritik = len(grp[grp["Öncelik"].str.contains("KRİTİK", na=False)])
+                        sla_as = len(grp[grp["SLA Durumu"].str.contains("Aşıldı", na=False)])
+                        vardiya_ozet.append({
+                            "Vardiya":          vardiya,
+                            "Toplam Arıza":     len(grp),
+                            "Kritik Arıza":     kritik,
+                            "Kapatılan":        len(kapat),
+                            "Ort. Süre (dk)":   round(kapat["sure"].mean(), 1) if not kapat.empty else 0,
+                            "SLA Aşımı":        sla_as,
+                            "Risk":             "🔴 Yüksek" if kritik > len(grp)*0.3 else "🟡 Orta" if kritik > 0 else "🟢 Düşük"
+                        })
+
+                    if vardiya_ozet:
+                        df_vard = pd.DataFrame(vardiya_ozet).sort_values("Toplam Arıza", ascending=False)
+
+                        col_v1, col_v2 = st.columns([2,1])
+                        with col_v1:
+                            st.dataframe(df_vard, use_container_width=True, hide_index=True)
+                        with col_v2:
+                            en_yogun = df_vard.iloc[0]
+                            st.markdown(f"""
+                            <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
+                                        border-radius:10px;padding:14px;text-align:center;">
+                              <div style="font-size:11px;color:#9B6FBF;text-transform:uppercase;margin-bottom:6px;">En Yoğun Vardiya</div>
+                              <div style="font-size:16px;font-weight:700;color:#FFD700;">{en_yogun["Vardiya"][:20]}</div>
+                              <div style="font-size:24px;font-weight:800;color:#E91E8C;margin:4px 0;">{en_yogun["Toplam Arıza"]}</div>
+                              <div style="font-size:11px;color:#9B6FBF;">arıza kaydı</div>
+                            </div>""", unsafe_allow_html=True)
+
+                        st.bar_chart(df_vard.set_index("Vardiya")["Toplam Arıza"], height=200)
+                else:
+                    st.caption("Vardiya verisi bulunamadı.")
+            except Exception as e:
+                st.caption(f"Vardiya analizi yüklenemedi: {e}")
+
+            # ── Maliyet Analizi ────────────────────────────────────────
+            st.markdown("---")
+            st.markdown("#### 💰 Maliyet Analizi & Bütçe Takibi")
+            try:
+                if not df_r.empty and "Toplam Maliyet (TL)" in df_r.columns:
+                    df_m = df_r[df_r["Durum"]=="Kapalı"].copy()
+                    df_m["maliyet"] = pd.to_numeric(df_m["Toplam Maliyet (TL)"], errors="coerce").fillna(0)
+                    df_m["isguc"]   = pd.to_numeric(df_m.get("İş Gücü Maliyeti (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0)
+                    df_m["malzeme"] = pd.to_numeric(df_m.get("Malzeme Maliyeti (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0)
+
+                    toplam_m = df_m["maliyet"].sum()
+                    toplam_is = df_m["isguc"].sum()
+                    toplam_mal = df_m["malzeme"].sum()
+
+                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                    with col_m1: st.metric("💰 Toplam Maliyet", f"{toplam_m:,.0f} ₺")
+                    with col_m2: st.metric("👨‍🔧 İş Gücü", f"{toplam_is:,.0f} ₺", delta=f"%{round(toplam_is/max(toplam_m,1)*100,0):.0f}")
+                    with col_m3: st.metric("🔧 Malzeme", f"{toplam_mal:,.0f} ₺", delta=f"%{round(toplam_mal/max(toplam_m,1)*100,0):.0f}")
+                    with col_m4:
+                        en_pahali_mak = df_m.groupby("Makine")["maliyet"].sum().idxmax() if not df_m.empty else "—"
+                        en_pahali_val = df_m.groupby("Makine")["maliyet"].sum().max() if not df_m.empty else 0
+                        st.metric("🔴 En Maliyetli", en_pahali_mak[:15], delta=f"{en_pahali_val:,.0f} ₺")
+
+                    # Makine bazlı maliyet
+                    col_mc1, col_mc2 = st.columns(2)
+                    with col_mc1:
+                        st.markdown("**Makine Bazlı Toplam Maliyet**")
+                        mak_mal = df_m.groupby("Makine")["maliyet"].sum().sort_values(ascending=False).head(8)
+                        st.bar_chart(mak_mal, height=220)
+                    with col_mc2:
+                        st.markdown("**Aylık Maliyet Trendi**")
+                        try:
+                            df_m["_ay"] = pd.to_datetime(df_m["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.to_period("M").astype(str)
+                            aylik = df_m.groupby("_ay")["maliyet"].sum().tail(6)
+                            st.bar_chart(aylik, height=220)
+                        except: st.caption("Trend hesaplanamadı.")
+                else:
+                    st.caption("Maliyet verisi bulunamadı.")
+            except Exception as e:
+                st.caption(f"Maliyet analizi yüklenemedi: {e}")
+
+            # ── ISO 55001 Uyumluluk ────────────────────────────────────
+            st.markdown("---")
+            st.markdown("#### 📋 ISO 55001 Varlık Yönetimi Uyumluluk Skoru")
+            st.caption("ISO 55001, varlık yönetimi uluslararası standardıdır. Sisteminizin bu standarda uygunluğunu otomatik değerlendirir.")
+            try:
+                if not df_r.empty:
+                    df_iso = df_r.copy()
+                    toplam_iso = max(len(df_iso), 1)
+                    kapat_iso  = df_iso[df_iso["Durum"]=="Kapalı"]
+
+                    # ISO 55001 kriterleri
+                    kriterler = []
+
+                    # 1. Arıza kayıt kalitesi
+                    dolu_alan = df_iso[["Bildiren","Makine","Arıza Türü","Arıza Tanımı"]].notna().all(axis=1).sum()
+                    k1 = round(dolu_alan / toplam_iso * 100, 1)
+                    kriterler.append({"Kriter": "📝 Arıza Kayıt Kalitesi", "Puan": k1, "Açıklama": "Zorunlu alanların doluluk oranı"})
+
+                    # 2. SLA uyumu
+                    sla_ic = len(df_iso[df_iso["SLA Durumu"].str.contains("İçinde", na=False)])
+                    k2 = round(sla_ic / toplam_iso * 100, 1)
+                    kriterler.append({"Kriter": "⏱ SLA Uyum Oranı", "Puan": k2, "Açıklama": "Müdahale süresi hedeflerine uyum"})
+
+                    # 3. Kök neden analizi
+                    kok_dolu = len(kapat_iso[kapat_iso["Kök Neden"].notna() & (kapat_iso["Kök Neden"] != "")]) if "Kök Neden" in kapat_iso.columns else 0
+                    k3 = round(kok_dolu / max(len(kapat_iso), 1) * 100, 1)
+                    kriterler.append({"Kriter": "🔍 Kök Neden Analizi", "Puan": k3, "Açıklama": "Kapatılan taleplerde kök neden oranı"})
+
+                    # 4. Periyodik bakım planı
+                    df_bp_iso = bakim_df_getir()
+                    makine_sayisi = df_iso["Makine"].nunique() if "Makine" in df_iso.columns else 1
+                    plan_sayisi   = len(df_bp_iso) if not df_bp_iso.empty else 0
+                    k4 = min(round(plan_sayisi / max(makine_sayisi, 1) * 100, 1), 100)
+                    kriterler.append({"Kriter": "🔧 Bakım Planı Kapsamı", "Puan": k4, "Açıklama": "Makine başına bakım planı oranı"})
+
+                    # 5. Çözüm belgeleme
+                    coz_dolu = len(kapat_iso[kapat_iso["Çözüm Açıklaması"].notna() & (kapat_iso["Çözüm Açıklaması"] != "")]) if "Çözüm Açıklaması" in kapat_iso.columns else 0
+                    k5 = round(coz_dolu / max(len(kapat_iso), 1) * 100, 1)
+                    kriterler.append({"Kriter": "📄 Çözüm Belgeleme", "Puan": k5, "Açıklama": "Kapatılan taleplerde çözüm dokümantasyonu"})
+
+                    # 6. Maliyet takibi
+                    mal_dolu = len(kapat_iso[pd.to_numeric(kapat_iso.get("Toplam Maliyet (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0) > 0])
+                    k6 = round(mal_dolu / max(len(kapat_iso), 1) * 100, 1)
+                    kriterler.append({"Kriter": "💰 Maliyet Takibi", "Puan": k6, "Açıklama": "Maliyet girilen talep oranı"})
+
+                    genel_skor = round(sum(k["Puan"] for k in kriterler) / len(kriterler), 1)
+                    skor_renk  = "#4ade80" if genel_skor>=80 else "#FFD700" if genel_skor>=60 else "#E91E8C"
+                    skor_yazi  = "✅ İYİ — ISO 55001 Uyumlu" if genel_skor>=80 else "⚠️ GELİŞTİRİLEBİLİR" if genel_skor>=60 else "🔴 YETERSİZ"
+
+                    col_iso1, col_iso2 = st.columns([1, 2])
+                    with col_iso1:
+                        st.markdown(f"""
+                        <div style="background:rgba(61,0,102,0.8);border:2px solid {skor_renk};
+                                    border-radius:12px;padding:24px;text-align:center;">
+                          <div style="font-size:11px;color:#9B6FBF;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">
+                            ISO 55001 Uyumluluk Skoru
+                          </div>
+                          <div style="font-size:52px;font-weight:900;color:{skor_renk};line-height:1;">
+                            {genel_skor}
+                          </div>
+                          <div style="font-size:20px;color:{skor_renk};margin:4px 0;">/100</div>
+                          <div style="font-size:13px;font-weight:700;color:{skor_renk};margin-top:8px;">
+                            {skor_yazi}
+                          </div>
+                          <div style="background:rgba(255,255,255,0.05);border-radius:6px;height:8px;margin-top:12px;overflow:hidden;">
+                            <div style="background:{skor_renk};width:{genel_skor}%;height:100%;border-radius:6px;"></div>
+                          </div>
+                        </div>""", unsafe_allow_html=True)
+
+                    with col_iso2:
+                        df_iso_tablo = pd.DataFrame(kriterler)
+                        df_iso_tablo["Durum"] = df_iso_tablo["Puan"].apply(
+                            lambda x: "✅ İyi" if x>=80 else "⚠️ Geliştirilmeli" if x>=60 else "🔴 Yetersiz"
+                        )
+                        st.dataframe(df_iso_tablo, use_container_width=True, hide_index=True)
+
+                    # İyileştirme önerileri
+                    eksik = [k for k in kriterler if k["Puan"] < 80]
+                    if eksik:
+                        st.markdown("**🎯 İyileştirme Önerileri:**")
+                        for k in sorted(eksik, key=lambda x: x["Puan"]):
+                            st.warning(f"**{k['Kriter']}** — %{k['Puan']} → {k['Açıklama']} oranını artırın")
+
+                    # İndir
+                    st.download_button(
+                        "📥 ISO 55001 Raporu İndir",
+                        data=df_iso_tablo.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+                        file_name=f"iso55001_raporu_{datetime.now().strftime('%Y%m%d')}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.caption("ISO analizi için yeterli veri yok.")
+            except Exception as e:
+                st.caption(f"ISO analizi yüklenemedi: {e}")
+
 # =============================================================================
 # SEKME 5: STOK YÖNETİMİ
 # =============================================================================

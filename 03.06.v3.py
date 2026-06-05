@@ -792,7 +792,39 @@ hr { border-color: rgba(255,215,0,0.15) !important; }
     /* Genel padding azalt */
     .main .block-container { padding: 8px 12px !important; }
 
-    /* Butonlar büyük ve tıklanabilir */
+    /* Tüm yazılar daha görünür */
+    p, span, div, li { color: #F0E8FF !important; font-size: 14px !important; }
+    label { color: #FFD700 !important; font-size: 13px !important; font-weight: 600 !important; margin-bottom: 4px !important; }
+
+    /* Input içindeki yazı */
+    [data-testid="stTextInput"] input {
+        min-height: 44px !important;
+        font-size: 16px !important;
+        color: #FFFFFF !important;
+        padding: 10px 12px !important;
+    }
+    [data-testid="stTextArea"] textarea {
+        font-size: 15px !important;
+        color: #FFFFFF !important;
+        padding: 10px 12px !important;
+    }
+    /* Selectbox yazısı */
+    [data-testid="stSelectbox"] > div > div {
+        min-height: 44px !important;
+        font-size: 15px !important;
+        color: #FFFFFF !important;
+    }
+    [data-testid="stSelectbox"] span { color: #FFFFFF !important; font-size: 15px !important; }
+
+    /* Number & time input */
+    [data-testid="stNumberInput"] input,
+    [data-testid="stTimeInput"] input {
+        min-height: 44px !important;
+        font-size: 16px !important;
+        color: #FFFFFF !important;
+    }
+
+    /* Butonlar */
     .stButton > button {
         min-height: 48px !important;
         font-size: 15px !important;
@@ -804,52 +836,43 @@ hr { border-color: rgba(255,215,0,0.15) !important; }
         font-weight: 800 !important;
         padding: 14px !important;
     }
-    /* Input alanları */
-    [data-testid="stTextInput"] input {
-        min-height: 44px !important;
-        font-size: 16px !important;
-        padding: 10px 12px !important;
-    }
-    [data-testid="stTextArea"] textarea {
-        font-size: 15px !important;
-        padding: 10px 12px !important;
-    }
-    /* Selectbox kompakt */
-    [data-testid="stSelectbox"] > div > div {
-        min-height: 44px !important;
-        font-size: 15px !important;
-    }
-    /* Number & time input */
-    [data-testid="stNumberInput"] input,
-    [data-testid="stTimeInput"] input {
-        min-height: 44px !important;
-        font-size: 16px !important;
-    }
-    /* Başlık küçült */
-    h1 { font-size: 18px !important; margin-bottom: 4px !important; }
-    h2 { font-size: 16px !important; }
-    h3 { font-size: 15px !important; }
-    h4 { font-size: 14px !important; }
+
+    /* Başlıklar parlak */
+    h1 { color: #FFD700 !important; font-size: 18px !important; margin-bottom: 4px !important; }
+    h2 { color: #FFD700 !important; font-size: 16px !important; }
+    h3 { color: #F0E8FF !important; font-size: 15px !important; }
+    h4 { color: #F0E8FF !important; font-size: 14px !important; }
+
+    /* Strong / bold yazılar */
+    strong { color: #FFD700 !important; }
+
     /* Boşlukları azalt */
-    [data-testid="stVerticalBlock"] > div {
-        gap: 6px !important;
-    }
-    /* Tab yazıları küçük */
+    [data-testid="stVerticalBlock"] > div { gap: 6px !important; }
+
+    /* Tab yazıları */
     [data-testid="stTabs"] [role="tab"] {
         font-size: 10px !important;
         padding: 5px 8px !important;
+        color: #C89EE8 !important;
     }
-    /* Metrikler kompakt */
-    [data-testid="metric-container"] {
-        padding: 10px 12px !important;
+    [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+        color: #FFD700 !important;
+        font-weight: 700 !important;
     }
+
+    /* Metrikler */
+    [data-testid="metric-container"] { padding: 10px 12px !important; }
+    [data-testid="metric-container"] label { color: #C89EE8 !important; font-size: 11px !important; }
     [data-testid="metric-container"] [data-testid="stMetricValue"] {
-        font-size: 20px !important;
+        font-size: 22px !important;
+        color: #FFD700 !important;
     }
-    /* Form alanı label küçük */
-    label { font-size: 12px !important; margin-bottom: 2px !important; }
+
     /* Caption */
-    [data-testid="stCaptionContainer"] p { font-size: 11px !important; }
+    [data-testid="stCaptionContainer"] p { font-size: 11px !important; color: #9B6FBF !important; }
+
+    /* Info/warning/error kutuları */
+    [data-testid="stAlert"] p { color: #FFFFFF !important; font-size: 14px !important; }
 }
 </style>
 """, unsafe_allow_html=True)

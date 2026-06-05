@@ -600,7 +600,7 @@ def kullanicilari_yukle() -> dict:
 # SAYFA KONFİGÜRASYONU & CSS
 # =============================================================================
 
-st.set_page_config(page_title="TeknikPro CMMS v2.0", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="TeknikPro CMMS v2.0", page_icon="🛡️", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
@@ -786,6 +786,65 @@ hr { border-color: rgba(255,215,0,0.15) !important; }
 
 /* ── RADIO ─────────────────────────────────────────────────── */
 [data-testid="stRadio"] label { color: #E8D5FF !important; }
+
+/* ── MOBİL OPTİMİZASYON ────────────────────────────────────── */
+@media (max-width: 768px) {
+    /* Butonlar büyük ve tıklanabilir */
+    .stButton > button {
+        min-height: 52px !important;
+        font-size: 15px !important;
+        padding: 14px 20px !important;
+    }
+    [data-testid="stFormSubmitButton"] > button {
+        min-height: 56px !important;
+        font-size: 16px !important;
+        padding: 16px !important;
+    }
+    /* Input alanları büyük */
+    [data-testid="stTextInput"] input {
+        min-height: 48px !important;
+        font-size: 16px !important;
+        padding: 12px !important;
+    }
+    [data-testid="stTextArea"] textarea {
+        font-size: 16px !important;
+        padding: 12px !important;
+    }
+    /* Selectbox büyük */
+    [data-testid="stSelectbox"] > div > div {
+        min-height: 48px !important;
+        font-size: 15px !important;
+    }
+    /* Number input büyük */
+    [data-testid="stNumberInput"] input {
+        min-height: 48px !important;
+        font-size: 16px !important;
+    }
+    /* Time input büyük */
+    [data-testid="stTimeInput"] input {
+        min-height: 48px !important;
+        font-size: 16px !important;
+    }
+    /* Kolonlar mobilde alt alta */
+    [data-testid="column"] {
+        min-width: 100% !important;
+    }
+    /* Metrikler büyük */
+    [data-testid="metric-container"] [data-testid="stMetricValue"] {
+        font-size: 22px !important;
+    }
+    /* Tab yazıları küçük */
+    [data-testid="stTabs"] [role="tab"] {
+        font-size: 11px !important;
+        padding: 6px 10px !important;
+    }
+    /* Başlık küçült */
+    h1 { font-size: 20px !important; }
+    /* KPI grid tek kolon */
+    .kpi-grid-mobile {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1269,53 +1328,47 @@ with tab_yeni:
         st.info(f"📱 QR Kod ile bağlandınız — Makine: **{qr_makine}**")
 
     # Arıza kategorisi ve alt kategori form dışında — birbirine bağlı dinamik güncellenir
-    ariza_liste  = aktif_ariza_turleri()
-    col_dyn1, col_dyn2 = st.columns(2)
-    with col_dyn1:
-        ariza_tur    = st.selectbox("Arıza Kategorisi *", list(ariza_liste.keys()))
-    with col_dyn2:
-        alt_tur_listesi = ariza_liste.get(ariza_tur, ["Diğer"])
-        alt_kategori = st.selectbox("Alt Kategori *", alt_tur_listesi)
+    ariza_liste = aktif_ariza_turleri()
+    ariza_tur   = st.selectbox("⚡ Arıza Kategorisi *", list(ariza_liste.keys()))
+    alt_tur_listesi = ariza_liste.get(ariza_tur, ["Diğer"])
+    alt_kategori    = st.selectbox("🔧 Alt Kategori *", alt_tur_listesi)
 
     with st.form("yeni_talep_formu", clear_on_submit=True):
         st.markdown("#### 👤 Bildiren Personel")
-        col_b1,col_b2,col_b3 = st.columns(3)
-        with col_b1:
-            bildiren = st.text_input("Ad Soyad *", placeholder="Ahmet Yıldız")
-        with col_b2:
-            bildiren_dept = st.selectbox("Departman *", ["Üretim","Depo","Lojistik","Bakım","Kalite","İdari","Diğer"])
-        with col_b3:
-            vardiya = st.selectbox("Vardiya *", ["Gündüz (08:00–16:00)","Akşam (16:00–00:00)","Gece (00:00–08:00)"])
+        bildiren      = st.text_input("Ad Soyad *", placeholder="Ahmet Yıldız")
+        bildiren_dept = st.selectbox("Departman *", ["Üretim","Depo","Lojistik","Bakım","Kalite","İdari","Diğer"])
+        vardiya       = st.selectbox("Vardiya *", ["Gündüz (08:00–16:00)","Akşam (16:00–00:00)","Gece (00:00–08:00)"])
 
         st.markdown(f"#### 🏭 Arıza Lokasyonu — {secili_bolge}")
-        col_m1,col_m2 = st.columns(2)
         mak_liste = aktif_makine_listesi().get(secili_bolge, MAKINE_LISTESI_BOLGE[secili_bolge])
-        # QR koddan makine geldiyse otomatik seç
         mak_index = mak_liste.index(qr_makine) if qr_makine in mak_liste else 0
-        with col_m1:
-            makine = st.selectbox("Makine / Sistem *", mak_liste, index=mak_index)
-            st.markdown(f"""<div style="background:rgba(30,41,59,0.5);border:1px solid rgba(99,179,237,0.15);
-                border-radius:8px;padding:10px 14px;font-size:13px;">
-                <span style="color:#64748b;">Kategori:</span>
-                <strong style="color:#e2e8f0;margin-left:6px;">{ariza_tur}</strong><br>
-                <span style="color:#64748b;">Alt Tür:</span>
-                <strong style="color:#93c5fd;margin-left:6px;">{alt_kategori}</strong>
-                </div>""", unsafe_allow_html=True)
-        with col_m2:
-            oncelik       = st.selectbox("Kritiklik Seviyesi (SLA) *", list(ARIZA_ONCELIKLERI.keys()))
-            bildirim_saat = st.text_input("Arıza Fark Edilme Saati",
-                value=st.session_state.get("bil_saat", datetime.now().strftime("%H:%M")),
-                help="SS:DD formatında")
+        makine    = st.selectbox("Makine / Sistem *", mak_liste, index=mak_index)
+        oncelik   = st.selectbox("🚨 Kritiklik Seviyesi (SLA) *", list(ARIZA_ONCELIKLERI.keys()))
+        bildirim_saat = st.text_input("🕐 Arıza Fark Edilme Saati",
+            value=st.session_state.get("bil_saat", datetime.now().strftime("%H:%M")),
+            help="SS:DD formatında")
 
-        ariza_tanimi = st.text_area("Arıza Tanımı *", placeholder="Arızanın belirti ve etkilerini açıklayın...", height=100)
-        foto_notu    = st.text_input("Fotoğraf / Referans Notu", placeholder="Opsiyonel")
+        # Seçilen kategori özeti
+        st.markdown(f"""
+        <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
+                    border-radius:8px;padding:10px 14px;font-size:13px;margin:4px 0;">
+          ⚡ <strong style="color:#FFD700;">{ariza_tur}</strong>
+          &nbsp;›&nbsp;
+          <span style="color:#C89EE8;">{alt_kategori}</span>
+        </div>""", unsafe_allow_html=True)
+
+        ariza_tanimi = st.text_area("📝 Arıza Tanımı *",
+            placeholder="Arızanın belirti ve etkilerini açıklayın...", height=120)
+        foto_notu    = st.text_input("📎 Fotoğraf / Referans Notu", placeholder="Opsiyonel")
 
         sla_bilgi = ARIZA_ONCELIKLERI[oncelik]
         st.markdown(f"""
-        <div style="background:rgba(30,41,59,0.6);border:1px solid rgba(99,179,237,0.15);border-radius:8px;padding:12px 16px;margin:8px 0;font-size:12px;">
-          🏭 <strong style="color:#93c5fd;">Bölge:</strong> <span style="color:#fbbf24;">{secili_bolge}</span>
+        <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.15);
+                    border-radius:8px;padding:12px 16px;margin:8px 0;font-size:12px;">
+          🏭 <strong style="color:#FFD700;">Bölge:</strong> <span style="color:#E8D5FF;">{secili_bolge}</span>
           &nbsp;&nbsp;|&nbsp;&nbsp;
-          ⏱ <strong style="color:#93c5fd;">SLA Hedefi:</strong> <strong style="color:#fbbf24;">{sla_bilgi["sla_dk"]} dakika</strong>
+          ⏱ <strong style="color:#FFD700;">SLA Hedefi:</strong>
+          <strong style="color:#4ade80;">{sla_bilgi["sla_dk"]} dakika</strong>
         </div>""", unsafe_allow_html=True)
 
         submit_yeni = st.form_submit_button("🚀 Arıza Talebi Oluştur", use_container_width=True)
@@ -1736,11 +1789,13 @@ with tab_kapat:
                             key="mud_eden_form"
                         )
 
-                        col_k4,col_k5 = st.columns(2)
-                        with col_k4:
-                            kok_neden = st.selectbox("Kök Neden", ["Yağlama eksikliği","Aşınma (ömür tükenmesi)","Hatalı kullanım","Yetersiz bakım periyodu","Tasarım/malzeme yetersizliği","Dış etken (toz, nem, darbe)","Yazılım/donanım arızası","Bilinmiyor","Diğer"])
-                        with col_k5:
-                            kapat_onayi = st.selectbox("Kapatma Onayı", ["Teknisyen Onayı","Vardiya Amiri Onayı","Bakım Müdürü Onayı"])
+                        kok_neden    = st.selectbox("🔍 Kök Neden", [
+                            "Yağlama eksikliği","Aşınma (ömür tükenmesi)",
+                            "Hatalı kullanım","Yetersiz bakım periyodu",
+                            "Tasarım/malzeme yetersizliği","Dış etken (toz, nem, darbe)",
+                            "Yazılım/donanım arızası","Bilinmiyor","Diğer"])
+                        kapat_onayi = st.selectbox("✅ Kapatma Onayı", [
+                            "Teknisyen Onayı","Vardiya Amiri Onayı","Bakım Müdürü Onayı"])
 
                         cozum_aciklama = st.text_area("Uygulanan Çözüm & Teknik Notlar *", height=90)
                         neden_analizi  = st.text_area("5 Neden Analizi", height=90)
@@ -1752,10 +1807,9 @@ with tab_kapat:
                         if not df_stok_k.empty and "Malzeme Adı" in df_stok_k.columns:
                             stok_sec += df_stok_k["Malzeme Adı"].tolist()
 
-                        col_stk1,col_stk2,col_stk3 = st.columns(3)
-                        with col_stk1: malzeme_secim  = st.selectbox("Stoktan Malzeme", stok_sec)
-                        with col_stk2: malzeme_adet   = st.number_input("Kullanılan Miktar", min_value=0, step=1, value=0)
-                        with col_stk3: malzeme_maliyet= st.number_input("Malzeme Maliyeti (TL)", min_value=0, step=50, value=0)
+                        malzeme_secim  = st.selectbox("📦 Stoktan Malzeme", stok_sec)
+                        malzeme_adet   = st.number_input("Kullanılan Miktar", min_value=0, step=1, value=0)
+                        malzeme_maliyet= st.number_input("Malzeme Maliyeti (TL)", min_value=0, step=50, value=0)
 
                         submit_kapat = st.form_submit_button("✅ Talebi Kapat & Kaydet", use_container_width=True)
 

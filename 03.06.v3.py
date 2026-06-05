@@ -3783,7 +3783,11 @@ with tab_twin:
             }
         }
 
-        bolge_df = df_twin[df_twin["Bölge"]==twin_bolge] if not df_twin.empty and "Bölge" in df_twin.columns else pd.DataFrame()
+        bolge_df = pd.DataFrame()
+        if not df_twin.empty and "Bölge" in df_twin.columns:
+            # Bölge adını esnek eşleştir
+            bolge_kisa = "Adana" if "Adana" in twin_bolge else "Tuzla"
+            bolge_df = df_twin[df_twin["Bölge"].str.contains(bolge_kisa, na=False)]
         toplam_mak = sum(len(v) for v in gruplar[twin_bolge].values())
         kritik_mak = sum(1 for g in gruplar[twin_bolge].values() for m in g if makine_durum(m, bolge_df)[0]=="kritik")
         uyari_mak  = sum(1 for g in gruplar[twin_bolge].values() for m in g if makine_durum(m, bolge_df)[0]=="uyari")
@@ -3809,13 +3813,20 @@ with tab_twin:
                         d = durum_map[durum]
                         mak_kisa = mak.replace(" (Hat A)","").replace(" (Hat B)","").replace(" (Tuzla)","").replace(" (Tuzla Depo)","").replace(" (Depo Sahası)","")
                         sayi_html = f"<div style=\"font-size:9px;color:#9B6FBF;margin-top:2px;\">{sayi} talep</div>" if sayi > 0 else ""
-                        st.markdown(f"""<div style="background:{d['bg']};border:2px solid {d['border']};
-                            border-radius:10px;padding:12px 8px;text-align:center;min-height:90px;">
-                          <div style="font-size:20px;margin-bottom:4px;">{d['ikon']}</div>
-                          <div style="font-size:11px;font-weight:700;color:#F0E8FF;line-height:1.3;margin-bottom:4px;">{mak_kisa}</div>
-                          <div style="font-size:10px;font-weight:700;color:{d['renk']};text-transform:uppercase;">{d['etiket']}</div>
-                          {sayi_html}
-                        </div>""", unsafe_allow_html=True)
+                        bg      = d['bg']
+                        border  = d['border']
+                        ikon    = d['ikon']
+                        renk    = d['renk']
+                        etiket  = d['etiket']
+                        html_kart  = "<div style=\"background:" + bg + ";border:2px solid " + border + ";"
+                        html_kart += "border-radius:10px;padding:12px 8px;text-align:center;min-height:90px;\">"
+                        html_kart += "<div style=\"font-size:22px;margin-bottom:6px;\">" + ikon + "</div>"
+                        html_kart += "<div style=\"font-size:11px;font-weight:700;color:#F0E8FF;line-height:1.3;margin-bottom:4px;\">" + mak_kisa + "</div>"
+                        html_kart += "<div style=\"font-size:10px;font-weight:700;color:" + renk + ";text-transform:uppercase;\">" + etiket + "</div>"
+                        if sayi > 0:
+                            html_kart += "<div style=\"font-size:9px;color:#9B6FBF;margin-top:2px;\">" + str(sayi) + " talep</div>"
+                        html_kart += "</div>"
+                        st.markdown(html_kart, unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
 
         st.markdown("---")
@@ -3825,17 +3836,20 @@ with tab_twin:
         if sec_mak:
             durum_d, aciklama_d, sayi_d = makine_durum(sec_mak, bolge_df)
             d_info = durum_map[durum_d]
-            mak_df_detay = bolge_df[bolge_df["Makine"]==sec_mak] if not bolge_df.empty and "Makine" in bolge_df.columns else pd.DataFrame()
+            mak_df_detay = bolge_df[bolge_df["Makine"].str.contains(sec_mak.split(" (")[0], na=False)] if not bolge_df.empty and "Makine" in bolge_df.columns else pd.DataFrame()
+            if mak_df_detay.empty and not bolge_df.empty:
+                mak_df_detay = bolge_df[bolge_df["Makine"]==sec_mak]
             col_dd1, col_dd2 = st.columns([1, 2])
             with col_dd1:
                 acikl_html = f"<div style=\"font-size:12px;color:#C89EE8;margin-top:8px;\">{aciklama_d}</div>" if aciklama_d else ""
-                st.markdown(f"""<div style="background:{d_info['bg']};border:2px solid {d_info['border']};
-                    border-radius:12px;padding:20px;text-align:center;">
-                  <div style="font-size:40px;">{d_info['ikon']}</div>
-                  <div style="font-size:15px;font-weight:700;color:#F0E8FF;margin:8px 0 4px;">{sec_mak}</div>
-                  <div style="font-size:13px;font-weight:800;color:{d_info['renk']};text-transform:uppercase;">{d_info['etiket']}</div>
-                  {acikl_html}
-                </div>""", unsafe_allow_html=True)
+                det_html  = "<div style=\"background:" + d_info['bg'] + ";border:2px solid " + d_info['border'] + ";border-radius:12px;padding:20px;text-align:center;\">"
+                det_html += "<div style=\"font-size:40px;\">" + d_info['ikon'] + "</div>"
+                det_html += "<div style=\"font-size:15px;font-weight:700;color:#F0E8FF;margin:8px 0 4px;\">" + sec_mak + "</div>"
+                det_html += "<div style=\"font-size:13px;font-weight:800;color:" + d_info['renk'] + ";text-transform:uppercase;\">" + d_info['etiket'] + "</div>"
+                if aciklama_d:
+                    det_html += "<div style=\"font-size:12px;color:#C89EE8;margin-top:8px;\">" + aciklama_d + "</div>"
+                det_html += "</div>"
+                st.markdown(det_html, unsafe_allow_html=True)
             with col_dd2:
                 if not mak_df_detay.empty:
                     df_kap_d = mak_df_detay[mak_df_detay["Durum"]=="Kapalı"].copy()

@@ -395,6 +395,12 @@ def veritabani_hazirla():
 secrets_kontrol()
 veritabani_hazirla()
 
+# Haftalık rapor kontrolü — Pazartesi sabahı otomatik gönderir
+try:
+    haftalik_rapor_gonder()
+except Exception:
+    pass
+
 # =============================================================================
 # YARDIMCI FONKSİYONLAR
 # =============================================================================
@@ -406,6 +412,107 @@ def log_yaz(islem: str, detay: str = ""):
         "islem":    islem,
         "detay":    detay
     })
+
+def haftalik_rapor_gonder():
+    """Her Pazartesi sabahı otomatik haftalık rapor emaili gönder."""
+    try:
+        bugun = date.today()
+        # Sadece Pazartesi (weekday=0) çalış
+        if bugun.weekday() != 0:
+            return
+        # Bu hafta zaten gönderildi mi?
+        hafta_no = bugun.strftime("%Y-W%W")
+        mevcut = sb_select("haftalik_rapor_log", f"hafta=eq.{hafta_no}&durum=eq.Gönderildi")
+        if mevcut:
+            return  # Bu hafta zaten gönderilmiş
+
+        # Veri topla
+        df_h = ariza_df_getir()
+        if df_h.empty:
+            return
+
+        gecen_pzt  = bugun - timedelta(days=7)
+        gecen_paz  = bugun - timedelta(days=1)
+
+        try:
+            df_h["_t"] = pd.to_datetime(df_h["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
+            df_hafta   = df_h[(df_h["_t"] >= gecen_pzt) & (df_h["_t"] <= gecen_paz)]
+        except:
+            df_hafta = df_h
+
+        toplam_h    = len(df_hafta)
+        acik_h      = len(df_h[df_h["Durum"] == "Açık"])
+        kritik_h    = len(df_h[(df_h["Durum"]=="Açık") & (df_h["Öncelik"].str.startswith("🔴",na=False))])
+        kapali_h    = len(df_hafta[df_hafta["Durum"] == "Kapalı"])
+        sla_asan_h  = len(df_hafta[df_hafta["SLA Durumu"].str.contains("Aşıldı",na=False)])
+        sla_oran_h  = round((toplam_h - sla_asan_h) / max(toplam_h, 1) * 100, 1)
+
+        df_kap_h = df_hafta[df_hafta["Durum"]=="Kapalı"].copy()
+        df_kap_h["sure"] = pd.to_numeric(df_kap_h.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        ort_mttr_h = round(df_kap_h["sure"].mean(), 1) if not df_kap_h.empty else 0
+        toplam_mal_h = pd.to_numeric(df_hafta.get("Toplam Maliyet (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0).sum()
+
+        # En sorunlu makine
+        en_sorunlu = df_hafta["Makine"].value_counts().head(3).to_dict() if not df_hafta.empty and "Makine" in df_hafta.columns else {}
+        en_sorunlu_txt = "\n".join([f"  • {k}: {v} arıza" for k,v in en_sorunlu.items()]) or "  • Veri yok"
+
+        # Açık kritik talepler
+        kritik_listesi = df_h[(df_h["Durum"]=="Açık") & (df_h["Öncelik"].str.startswith("🔴",na=False))].head(5)
+        kritik_txt = ""
+        for _, r in kritik_listesi.iterrows():
+            kritik_txt += f"  • [{r.get('Talep No','')}] {r.get('Makine','')} — {str(r.get('Arıza Tanımı',''))[:50]}\n"
+        kritik_txt = kritik_txt or "  • Kritik açık talep yok ✅"
+
+        icerik = f"""
+Merhaba,
+
+Geçen haftanın ({gecen_pzt.strftime('%d/%m/%Y')} - {gecen_paz.strftime('%d/%m/%Y')}) bakım ve arıza özeti aşağıdadır.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 HAFTALIK ÖZET
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Bu Hafta Açılan Talepler : {toplam_h}
+Kapatılan Talepler        : {kapali_h}
+SLA Uyum Oranı           : %{sla_oran_h}
+SLA Aşımı                : {sla_asan_h} talep
+Ortalama MTTR            : {ort_mttr_h} dakika
+Toplam Maliyet           : {toplam_mal_h:,.0f} ₺
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 MEVCUT DURUM (Bugün İtibarıyla)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Toplam Açık Talep  : {acik_h}
+Kritik Açık Talep  : {kritik_h}
+
+Kritik Açık Talepler:
+{kritik_txt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔴 EN SORUNLU MAKİNELER (Bu Hafta)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{en_sorunlu_txt}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Sisteme erişmek için: https://teknikv2-78qrqxtnuqyue3bvmk69e2.streamlit.app
+
+TeknikPro CMMS v2.0 — Otomatik Haftalık Rapor
+"""
+        konu = f"📊 Haftalık Bakım Raporu — {gecen_pzt.strftime('%d/%m')} - {gecen_paz.strftime('%d/%m/%Y')}"
+        basari = email_gonder(konu, icerik)
+
+        # Log kaydet
+        sb_insert("haftalik_rapor_log", {
+            "gonderim_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "hafta":           hafta_no,
+            "durum":           "Gönderildi" if basari else "Hata"
+        })
+
+    except Exception as e:
+        print(f"Haftalık rapor hatası: {e}")
 
 def email_gonder(konu: str, icerik: str) -> bool:
     """Gmail ile bildirim emaili gönder. Secrets yoksa sessizce geç."""
@@ -2578,6 +2685,76 @@ with tab_ayar:
 
             except ImportError:
                 st.warning("⚠️ qrcode kütüphanesi yüklenmemiş.")
+
+            st.markdown("---")
+            st.markdown("#### 📊 Haftalık Rapor Ayarları")
+            st.caption("Her Pazartesi sabahı otomatik olarak haftalık özet raporu email ile gönderilir.")
+
+            # Son gönderim logu
+            try:
+                rapor_log = sb_select("haftalik_rapor_log")
+                if rapor_log:
+                    son = rapor_log[0]
+                    st.success(f"✅ Son rapor: **{son.get('gonderim_tarihi','')}** — Hafta: {son.get('hafta','')} — Durum: {son.get('durum','')}")
+                else:
+                    st.info("Henüz haftalık rapor gönderilmemiş.")
+            except:
+                pass
+
+            if st.button("📧 Şimdi Haftalık Rapor Gönder (Test)", key="haftalik_test"):
+                with st.spinner("Rapor hazırlanıyor..."):
+                    try:
+                        df_test = ariza_df_getir()
+                        acik_t  = len(df_test[df_test["Durum"]=="Açık"]) if not df_test.empty and "Durum" in df_test.columns else 0
+                        kritik_t= len(df_test[(df_test["Durum"]=="Açık") & (df_test["Öncelik"].str.startswith("🔴",na=False))]) if not df_test.empty else 0
+                        toplam_t= len(df_test) if not df_test.empty else 0
+
+                        kritik_listesi_t = df_test[(df_test["Durum"]=="Açık") & (df_test["Öncelik"].str.startswith("🔴",na=False))].head(5) if not df_test.empty else pd.DataFrame()
+                        kritik_txt_t = ""
+                        for _, r in kritik_listesi_t.iterrows():
+                            kritik_txt_t += f"  • [{r.get('Talep No','')}] {r.get('Makine','')} — {str(r.get('Arıza Tanımı',''))[:50]}\n"
+                        kritik_txt_t = kritik_txt_t or "  • Kritik açık talep yok ✅"
+
+                        en_sorunlu_t = df_test["Makine"].value_counts().head(3).to_dict() if not df_test.empty and "Makine" in df_test.columns else {}
+                        en_sorunlu_txt_t = "\n".join([f"  • {k}: {v} arıza" for k,v in en_sorunlu_t.items()]) or "  • Veri yok"
+
+                        icerik_test = f"""
+[TEST RAPORU] — {datetime.now().strftime('%d/%m/%Y %H:%M')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 MEVCUT SİSTEM DURUMU
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Toplam Talep       : {toplam_t}
+Açık Talepler      : {acik_t}
+Kritik Açık Talep  : {kritik_t}
+
+Kritik Açık Talepler:
+{kritik_txt_t}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔴 EN SORUNLU MAKİNELER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{en_sorunlu_txt_t}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sisteme erişim: https://teknikv2-78qrqxtnuqyue3bvmk69e2.streamlit.app
+
+TeknikPro CMMS v2.0 — Test Raporu
+"""
+                        ok = email_gonder("📊 [TEST] Haftalık Bakım Raporu — TeknikPro CMMS", icerik_test)
+                        if ok:
+                            sb_insert("haftalik_rapor_log", {
+                                "gonderim_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                                "hafta": date.today().strftime("%Y-W%W") + "-TEST",
+                                "durum": "Test Gönderildi"
+                            })
+                            st.success("✅ Test raporu email ile gönderildi!")
+                        else:
+                            st.error("❌ Email gönderilemedi. Email ayarlarını kontrol edin.")
+                    except Exception as e:
+                        st.error(f"❌ Hata: {e}")
 
             st.markdown("---")
             st.markdown("#### 📧 Email Bildirim Ayarları")

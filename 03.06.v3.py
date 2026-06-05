@@ -3764,105 +3764,109 @@ with tab_twin:
             "bilinmiyor":   {"renk": "#64748b", "bg": "rgba(100,116,139,0.1)", "border": "rgba(100,116,139,0.3)","ikon": "⚫", "etiket": "VERİ YOK"},
         }
 
-        gruplar = {
-            "🏭 Adana LM": {
-                "🚜 VNA Araçlar":     ["VNA-01 (Hat A)", "VNA-02 (Hat A)", "VNA-03 (Hat B)", "VNA-04 (Hat B)"],
-                "🔄 Reach Truck":     ["RT-01 (Depo Sahası)", "RT-02 (Depo Sahası)", "RT-03 (Depo Sahası)"],
-                "📦 Konveyör":        ["Konveyör Hattı 1", "Konveyör Hattı 2", "Konveyör Hattı 3"],
-                "⚡ Elektrik":        ["Kompresör İstasyonu", "Elektrik Panosu MCC-1", "Elektrik Panosu MCC-2", "Soğutma Ünitesi", "Jeneratör"],
-                "🚛 Taşıma":          ["Forklift FLT-01", "Forklift FLT-02", "Transpalet-01", "Transpalet-02"],
-                "🔧 Altyapı":         ["Şarj İstasyonu", "Kapı Otomasyonu", "Yangın Sistemi"],
-            },
-            "🏭 Tuzla LM": {
-                "🚜 VNA Araçlar":     ["VNA-01 (Tuzla)", "VNA-02 (Tuzla)", "VNA-03 (Tuzla)"],
-                "🔄 Reach Truck":     ["RT-01 (Tuzla Depo)", "RT-02 (Tuzla Depo)"],
-                "📦 Konveyör":        ["Konveyör Hattı 1 (Tuzla)", "Konveyör Hattı 2 (Tuzla)"],
-                "⚡ Elektrik":        ["Kompresör İstasyonu (Tuzla)", "Elektrik Panosu MCC-1 (Tuzla)", "Soğutma Ünitesi (Tuzla)", "Jeneratör (Tuzla)"],
-                "🚛 Taşıma":          ["Forklift FLT-01 (Tuzla)", "Forklift FLT-02 (Tuzla)", "Transpalet-01 (Tuzla)", "Transpalet-02 (Tuzla)"],
-                "🔧 Altyapı":         ["Şarj İstasyonu (Tuzla)", "Kapı Otomasyonu (Tuzla)", "Yangın Sistemi (Tuzla)"],
-            }
-        }
-
+        # Makine listesini Supabase'den dinamik al
         bolge_df = pd.DataFrame()
         if not df_twin.empty and "Bölge" in df_twin.columns:
-            # Bölge adını esnek eşleştir
             bolge_kisa = "Adana" if "Adana" in twin_bolge else "Tuzla"
             bolge_df = df_twin[df_twin["Bölge"].str.contains(bolge_kisa, na=False)]
-        toplam_mak = sum(len(v) for v in gruplar[twin_bolge].values())
-        kritik_mak = sum(1 for g in gruplar[twin_bolge].values() for m in g if makine_durum(m, bolge_df)[0]=="kritik")
-        uyari_mak  = sum(1 for g in gruplar[twin_bolge].values() for m in g if makine_durum(m, bolge_df)[0]=="uyari")
-        normal_mak = sum(1 for g in gruplar[twin_bolge].values() for m in g if makine_durum(m, bolge_df)[0] in ["normal","normal_uyari"])
 
-        kpi_html  = "<div style=\"display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;\">"
-        kpi_html += f"<div style=\"background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;\">Toplam Makine</div><div style=\"font-size:28px;font-weight:800;color:#FFD700;\">{toplam_mak}</div></div>"
-        kpi_html += f"<div style=\"background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;\">🟢 Normal</div><div style=\"font-size:28px;font-weight:800;color:#4ade80;\">{normal_mak}</div></div>"
-        kpi_html += f"<div style=\"background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;\">🟡 Açık Talep</div><div style=\"font-size:28px;font-weight:800;color:#FFD700;\">{uyari_mak}</div></div>"
-        kpi_html += f"<div style=\"background:rgba(233,30,140,0.1);border:1px solid rgba(233,30,140,0.3);border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;\">🔴 Kritik</div><div style=\"font-size:28px;font-weight:800;color:#E91E8C;\">{kritik_mak}</div></div>"
-        kpi_html += "</div>"
-        st.markdown(kpi_html, unsafe_allow_html=True)
+        # Gerçek makine listesini al
+        mak_listesi_db = aktif_makine_listesi()
+        gercek_makineler = []
+        for k, v in mak_listesi_db.items():
+            if "Adana" in twin_bolge and "Adana" in k:
+                gercek_makineler = [m for m in v if m and m != "Diğer"]
+                break
+            elif "Tuzla" in twin_bolge and "Tuzla" in k:
+                gercek_makineler = [m for m in v if m and m != "Diğer"]
+                break
 
-        for grup_adi, makineler in gruplar[twin_bolge].items():
-            st.markdown(f"**{grup_adi}**")
-            cols_per_row = 4
-            rows = [makineler[i:i+cols_per_row] for i in range(0, len(makineler), cols_per_row)]
-            for satir in rows:
-                cols = st.columns(len(satir))
-                for col, mak in zip(cols, satir):
-                    with col:
-                        durum, aciklama, sayi = makine_durum(mak, bolge_df)
-                        d = durum_map[durum]
-                        mak_kisa = mak.replace(" (Hat A)","").replace(" (Hat B)","").replace(" (Tuzla)","").replace(" (Tuzla Depo)","").replace(" (Depo Sahası)","")
-                        sayi_html = f"<div style=\"font-size:9px;color:#9B6FBF;margin-top:2px;\">{sayi} talep</div>" if sayi > 0 else ""
-                        bg      = d['bg']
-                        border  = d['border']
-                        ikon    = d['ikon']
-                        renk    = d['renk']
-                        etiket  = d['etiket']
-                        html_kart  = "<div style=\"background:" + bg + ";border:2px solid " + border + ";"
-                        html_kart += "border-radius:10px;padding:12px 8px;text-align:center;min-height:90px;\">"
-                        html_kart += "<div style=\"font-size:22px;margin-bottom:6px;\">" + ikon + "</div>"
-                        html_kart += "<div style=\"font-size:11px;font-weight:700;color:#F0E8FF;line-height:1.3;margin-bottom:4px;\">" + mak_kisa + "</div>"
-                        html_kart += "<div style=\"font-size:10px;font-weight:700;color:" + renk + ";text-transform:uppercase;\">" + etiket + "</div>"
-                        if sayi > 0:
-                            html_kart += "<div style=\"font-size:9px;color:#9B6FBF;margin-top:2px;\">" + str(sayi) + " talep</div>"
-                        html_kart += "</div>"
-                        st.markdown(html_kart, unsafe_allow_html=True)
-            st.markdown("<br>", unsafe_allow_html=True)
+        # Fallback — arıza verilerinden makine listesi
+        if not gercek_makineler and not bolge_df.empty and "Makine" in bolge_df.columns:
+            gercek_makineler = sorted([m for m in bolge_df["Makine"].unique().tolist() if m and m != "Diğer"])
 
-        st.markdown("---")
-        st.markdown("#### 🔍 Makine Detayı")
-        tum_makineler = [m for g in gruplar[twin_bolge].values() for m in g]
-        sec_mak = st.selectbox("Makine Seç", tum_makineler, key="twin_detay")
-        if sec_mak:
-            durum_d, aciklama_d, sayi_d = makine_durum(sec_mak, bolge_df)
-            d_info = durum_map[durum_d]
-            mak_df_detay = bolge_df[bolge_df["Makine"].str.contains(sec_mak.split(" (")[0], na=False)] if not bolge_df.empty and "Makine" in bolge_df.columns else pd.DataFrame()
-            if mak_df_detay.empty and not bolge_df.empty:
-                mak_df_detay = bolge_df[bolge_df["Makine"]==sec_mak]
-            col_dd1, col_dd2 = st.columns([1, 2])
-            with col_dd1:
-                acikl_html = f"<div style=\"font-size:12px;color:#C89EE8;margin-top:8px;\">{aciklama_d}</div>" if aciklama_d else ""
-                det_html  = "<div style=\"background:" + d_info['bg'] + ";border:2px solid " + d_info['border'] + ";border-radius:12px;padding:20px;text-align:center;\">"
-                det_html += "<div style=\"font-size:40px;\">" + d_info['ikon'] + "</div>"
-                det_html += "<div style=\"font-size:15px;font-weight:700;color:#F0E8FF;margin:8px 0 4px;\">" + sec_mak + "</div>"
-                det_html += "<div style=\"font-size:13px;font-weight:800;color:" + d_info['renk'] + ";text-transform:uppercase;\">" + d_info['etiket'] + "</div>"
-                if aciklama_d:
-                    det_html += "<div style=\"font-size:12px;color:#C89EE8;margin-top:8px;\">" + aciklama_d + "</div>"
-                det_html += "</div>"
-                st.markdown(det_html, unsafe_allow_html=True)
-            with col_dd2:
-                if not mak_df_detay.empty:
-                    df_kap_d = mak_df_detay[mak_df_detay["Durum"]=="Kapalı"].copy()
-                    df_kap_d["sure"] = pd.to_numeric(df_kap_d.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
-                    c1,c2,c3 = st.columns(3)
-                    with c1: st.metric("Toplam Arıza", len(mak_df_detay))
-                    with c2: st.metric("Kapatılan", len(df_kap_d))
-                    with c3: st.metric("MTTR", f"{round(df_kap_d['sure'].mean(),1) if not df_kap_d.empty else 0} dk")
-                    st.markdown("**Son Arızalar:**")
-                    gs = [s for s in ["Talep No","Açılış Tarihi","Öncelik","Durum","SLA Durumu"] if s in mak_df_detay.columns]
-                    st.dataframe(mak_df_detay[gs].head(5), use_container_width=True, hide_index=True)
-                else:
-                    st.info("Bu makine için henüz arıza kaydı bulunmuyor.")
+        if not gercek_makineler:
+            st.info("Bu bölge için makine kaydı bulunamadı. Sistem Ayarları → Makine Yönetimi bölümünden ekleyin.")
+        else:
+            def grup_belirle(mak):
+                m = mak.upper()
+                if any(x in m for x in ["VNA","VNA-"]): return "🚜 VNA Araçlar"
+                if any(x in m for x in ["RT-","REACH","RT1","RT2","RT3"]): return "🔄 Reach Truck"
+                if any(x in m for x in ["KONVEYÖR","KONVEYOR","BANT"]): return "📦 Konveyör"
+                if any(x in m for x in ["ELEKTRİK","ELEKTRIK","PANO","KOMPRESÖR","SOĞUTMA","JENERATÖR","MCC"]): return "⚡ Elektrik & Enerji"
+                if any(x in m for x in ["FORKLİFT","FORKLIFT","FLT","TRANSPALET"]): return "🚛 Taşıma & Lojistik"
+                if any(x in m for x in ["ŞARJ","SARJ","KAPI","YANGIN"]): return "🔧 Altyapı"
+                return "📋 Diğer"
+
+            dinamik_gruplar = {}
+            for mak in gercek_makineler:
+                grup = grup_belirle(mak)
+                dinamik_gruplar.setdefault(grup, []).append(mak)
+
+            toplam_mak = len(gercek_makineler)
+            kritik_mak = sum(1 for m in gercek_makineler if makine_durum(m, bolge_df)[0]=="kritik")
+            uyari_mak  = sum(1 for m in gercek_makineler if makine_durum(m, bolge_df)[0]=="uyari")
+            normal_mak = sum(1 for m in gercek_makineler if makine_durum(m, bolge_df)[0] in ["normal","normal_uyari"])
+
+            kpi_html  = "<div style=\"display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;\">"
+            kpi_html += "<div style=\"background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;\">Toplam Makine</div><div style=\"font-size:28px;font-weight:800;color:#FFD700;\">" + str(toplam_mak) + "</div></div>"
+            kpi_html += "<div style=\"background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.3);border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;\">🟢 Normal</div><div style=\"font-size:28px;font-weight:800;color:#4ade80;\">" + str(normal_mak) + "</div></div>"
+            kpi_html += "<div style=\"background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.3);border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;\">🟡 Açık Talep</div><div style=\"font-size:28px;font-weight:800;color:#FFD700;\">" + str(uyari_mak) + "</div></div>"
+            kpi_html += "<div style=\"background:rgba(233,30,140,0.1);border:1px solid rgba(233,30,140,0.3);border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;\">🔴 Kritik</div><div style=\"font-size:28px;font-weight:800;color:#E91E8C;\">" + str(kritik_mak) + "</div></div>"
+            kpi_html += "</div>"
+            st.markdown(kpi_html, unsafe_allow_html=True)
+
+            for grup_adi, makineler in dinamik_gruplar.items():
+                st.markdown(f"**{grup_adi}**")
+                rows = [makineler[i:i+4] for i in range(0, len(makineler), 4)]
+                for satir in rows:
+                    cols = st.columns(len(satir))
+                    for col, mak in zip(cols, satir):
+                        with col:
+                            durum, aciklama, sayi = makine_durum(mak, bolge_df)
+                            d = durum_map[durum]
+                            mak_kisa = mak
+                            for suf in [" (Hat A)"," (Hat B)"," (Tuzla)"," (Tuzla Depo)"," (Depo Sahası)"," (Adana LM)"," (Tuzla LM)"]:
+                                mak_kisa = mak_kisa.replace(suf,"")
+                            html_kart  = "<div style=\"background:" + d["bg"] + ";border:2px solid " + d["border"] + ";border-radius:10px;padding:10px 6px;text-align:center;min-height:85px;\">"
+                            html_kart += "<div style=\"font-size:20px;margin-bottom:4px;\">" + d["ikon"] + "</div>"
+                            html_kart += "<div style=\"font-size:11px;font-weight:700;color:#F0E8FF;line-height:1.3;margin-bottom:3px;\">" + mak_kisa + "</div>"
+                            html_kart += "<div style=\"font-size:10px;font-weight:700;color:" + d["renk"] + ";text-transform:uppercase;\">" + d["etiket"] + "</div>"
+                            if sayi > 0:
+                                html_kart += "<div style=\"font-size:9px;color:#9B6FBF;margin-top:2px;\">" + str(sayi) + " talep</div>"
+                            html_kart += "</div>"
+                            st.markdown(html_kart, unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+
+            st.markdown("---")
+            st.markdown("#### 🔍 Makine Detayı")
+            sec_mak = st.selectbox("Makine Seç", gercek_makineler, key="twin_detay")
+            if sec_mak:
+                durum_d, aciklama_d, sayi_d = makine_durum(sec_mak, bolge_df)
+                d_info = durum_map[durum_d]
+                mak_df_detay = bolge_df[bolge_df["Makine"]==sec_mak] if not bolge_df.empty and "Makine" in bolge_df.columns else pd.DataFrame()
+                col_dd1, col_dd2 = st.columns([1, 2])
+                with col_dd1:
+                    det_html  = "<div style=\"background:" + d_info["bg"] + ";border:2px solid " + d_info["border"] + ";border-radius:12px;padding:20px;text-align:center;\">"
+                    det_html += "<div style=\"font-size:40px;\">" + d_info["ikon"] + "</div>"
+                    det_html += "<div style=\"font-size:15px;font-weight:700;color:#F0E8FF;margin:8px 0 4px;\">" + sec_mak + "</div>"
+                    det_html += "<div style=\"font-size:13px;font-weight:800;color:" + d_info["renk"] + ";text-transform:uppercase;\">" + d_info["etiket"] + "</div>"
+                    if aciklama_d:
+                        det_html += "<div style=\"font-size:12px;color:#C89EE8;margin-top:8px;\">" + aciklama_d + "</div>"
+                    det_html += "</div>"
+                    st.markdown(det_html, unsafe_allow_html=True)
+                with col_dd2:
+                    if not mak_df_detay.empty:
+                        df_kap_d = mak_df_detay[mak_df_detay["Durum"]=="Kapalı"].copy()
+                        df_kap_d["sure"] = pd.to_numeric(df_kap_d.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
+                        c1,c2,c3 = st.columns(3)
+                        with c1: st.metric("Toplam Arıza", len(mak_df_detay))
+                        with c2: st.metric("Kapatılan", len(df_kap_d))
+                        with c3: st.metric("MTTR", f"{round(df_kap_d['sure'].mean(),1) if not df_kap_d.empty else 0} dk")
+                        gs = [s for s in ["Talep No","Açılış Tarihi","Öncelik","Durum","SLA Durumu"] if s in mak_df_detay.columns]
+                        st.dataframe(mak_df_detay[gs].head(5), use_container_width=True, hide_index=True)
+                    else:
+                        st.info("Bu makine için henüz arıza kaydı bulunmuyor.")
 
 # =============================================================================
 # FOOTER

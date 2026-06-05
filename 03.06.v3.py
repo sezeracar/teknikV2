@@ -796,29 +796,47 @@ hr { border-color: rgba(255,215,0,0.15) !important; }
     p, span, div, li { color: #F0E8FF !important; font-size: 14px !important; }
     label { color: #FFD700 !important; font-size: 13px !important; font-weight: 600 !important; margin-bottom: 4px !important; }
 
-    /* Input içindeki yazı */
+    /* Input kutucukları — arka plan + border + yazı */
+    [data-testid="stTextInput"] > div,
     [data-testid="stTextInput"] input {
+        background: rgba(30,0,56,0.95) !important;
+        border: 2px solid rgba(255,215,0,0.5) !important;
+        border-radius: 10px !important;
         min-height: 44px !important;
         font-size: 16px !important;
         color: #FFFFFF !important;
         padding: 10px 12px !important;
     }
+    [data-testid="stTextArea"] > div,
     [data-testid="stTextArea"] textarea {
+        background: rgba(30,0,56,0.95) !important;
+        border: 2px solid rgba(255,215,0,0.5) !important;
+        border-radius: 10px !important;
         font-size: 15px !important;
         color: #FFFFFF !important;
         padding: 10px 12px !important;
     }
-    /* Selectbox yazısı */
+    /* Selectbox kutucuk */
+    [data-testid="stSelectbox"] > div,
     [data-testid="stSelectbox"] > div > div {
+        background: rgba(30,0,56,0.95) !important;
+        border: 2px solid rgba(255,215,0,0.5) !important;
+        border-radius: 10px !important;
         min-height: 44px !important;
         font-size: 15px !important;
         color: #FFFFFF !important;
     }
-    [data-testid="stSelectbox"] span { color: #FFFFFF !important; font-size: 15px !important; }
+    [data-testid="stSelectbox"] span,
+    [data-testid="stSelectbox"] p { color: #FFFFFF !important; font-size: 15px !important; }
 
     /* Number & time input */
+    [data-testid="stNumberInput"] > div,
     [data-testid="stNumberInput"] input,
+    [data-testid="stTimeInput"] > div,
     [data-testid="stTimeInput"] input {
+        background: rgba(30,0,56,0.95) !important;
+        border: 2px solid rgba(255,215,0,0.5) !important;
+        border-radius: 10px !important;
         min-height: 44px !important;
         font-size: 16px !important;
         color: #FFFFFF !important;

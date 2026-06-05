@@ -2688,7 +2688,7 @@ with tab_ayar:
 
             st.markdown("---")
             st.markdown("#### 📊 Haftalık Rapor Ayarları")
-            st.caption("Her Pazartesi sabahı otomatik olarak haftalık özet raporu email ile gönderilir.")
+            st.caption("Her Pazartesi sabahı otomatik gönderilir. İstediğiniz zaman manuel de gönderebilirsiniz.")
 
             # Son gönderim logu
             try:
@@ -2701,7 +2701,7 @@ with tab_ayar:
             except:
                 pass
 
-            if st.button("📧 Şimdi Haftalık Rapor Gönder (Test)", key="haftalik_test"):
+            if st.button("📧 Anlık Durum Raporu Gönder", key="haftalik_test", use_container_width=True):
                 with st.spinner("Rapor hazırlanıyor..."):
                     try:
                         df_test = ariza_df_getir()

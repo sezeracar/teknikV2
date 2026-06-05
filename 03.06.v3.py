@@ -2098,7 +2098,10 @@ with tab_rapor:
                     kriterler.append({"Kriter": "🔍 Kök Neden Analizi", "Puan": k3, "Açıklama": "Kapatılan taleplerde kök neden oranı"})
 
                     # 4. Periyodik bakım planı
-                    df_bp_iso = bakim_df_getir()
+                    try:
+                        df_bp_iso = bakim_df_getir()
+                    except:
+                        df_bp_iso = pd.DataFrame()
                     makine_sayisi = df_iso["Makine"].nunique() if "Makine" in df_iso.columns else 1
                     plan_sayisi   = len(df_bp_iso) if not df_bp_iso.empty else 0
                     k4 = min(round(plan_sayisi / max(makine_sayisi, 1) * 100, 1), 100)

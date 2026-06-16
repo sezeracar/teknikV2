@@ -786,7 +786,9 @@ hr { border-color: rgba(255,215,0,0.15) !important; }
 
 /* ── RADIO ─────────────────────────────────────────────────── */
 [data-testid="stRadio"] label { color: #E8D5FF !important; }
-
+/* ── STREAMLIT TOOLBAR GİZLE ───────────────────────────────── */
+header[data-testid="stHeader"] { display: none !important; }
+[data-testid="stToolbar"] { display: none !important; }
 /* ── MOBİL OPTİMİZASYON ────────────────────────────────────── */
 @media (max-width: 768px) {
     /* Genel padding azalt */

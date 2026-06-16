@@ -1,11 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-=============================================================================
-TEKNIK BAKIM & ARIZA YÖNETİM SİSTEMİ v2.0
-Enterprise-Grade TPM & CMMS Platform — Supabase Edition
-=============================================================================
-"""
-
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -15,10 +8,6 @@ import hashlib
 import json
 import time
 import requests
-
-# =============================================================================
-# SABITLER
-# =============================================================================
 
 BOLGELER = ["🏭 Adana LM", "🏭 Tuzla LM"]
 
@@ -45,10 +34,7 @@ MAKINE_LISTESI_BOLGE = {
     ]
 }
 
-# Geriye dönük uyumluluk
-MAKINE_LISTESI = sorted(set(
-    m for bl in MAKINE_LISTESI_BOLGE.values() for m in bl
-))
+MAKINE_LISTESI = sorted(set(m for bl in MAKINE_LISTESI_BOLGE.values() for m in bl))
 
 ARIZA_TURLERI = {
     "⚡ Elektrik": [
@@ -113,23 +99,19 @@ STOK_SUTUNLARI = [
     "Son Fiyat (TL)", "Tedarikçi", "Son Güncelleme"
 ]
 
-# =============================================================================
-# SUPABASE BAĞLANTI KATMANI
-# =============================================================================
-
-def sb_url() -> str:
+def sb_url():
     try:
         return st.secrets["supabase"]["url"]
     except Exception:
         return ""
 
-def sb_key() -> str:
+def sb_key():
     try:
         return st.secrets["supabase"]["key"]
     except Exception:
         return ""
 
-def sb_headers() -> dict:
+def sb_headers():
     return {
         "apikey":        sb_key(),
         "Authorization": f"Bearer {sb_key()}",
@@ -137,7 +119,7 @@ def sb_headers() -> dict:
         "Prefer":        "return=representation"
     }
 
-def secrets_kontrol() -> bool:
+def secrets_kontrol():
     try:
         u = st.secrets["supabase"]["url"]
         k = st.secrets["supabase"]["key"]
@@ -146,25 +128,14 @@ def secrets_kontrol() -> bool:
         return True
     except (KeyError, FileNotFoundError):
         st.error("⚙️ **Supabase bağlantısı yapılandırılmamış.**")
-        st.markdown("""
-        **Kurulum adımları:**
-        1. [share.streamlit.io](https://share.streamlit.io) → Uygulamanız → **⋮ → Settings → Secrets**
-        2. Aşağıdaki içeriği yapıştırın ve kaydedin:
-        ```toml
-        [supabase]
-        url = "https://PROJE_ADINIZ.supabase.co"
-        key = "ANON_PUBLIC_KEY"
-        ```
-        3. Supabase değerleri için: **supabase.com → Projeniz → Project Settings → API**
-        """)
         st.stop()
         return False
 
-def sb_select(tablo: str, filtre: str = "") -> list:
+def sb_select(tablo, filtre=""):
     try:
         if not sb_url():
             return []
-        url = f"{sb_url()}/rest/v1/{tablo}?{filtre}&order=id.desc" if filtre else               f"{sb_url()}/rest/v1/{tablo}?order=id.desc"
+        url = f"{sb_url()}/rest/v1/{tablo}?{filtre}&order=id.desc" if filtre else f"{sb_url()}/rest/v1/{tablo}?order=id.desc"
         r = requests.get(url, headers=sb_headers(), timeout=10)
         if r.ok:
             result = r.json()
@@ -173,7 +144,7 @@ def sb_select(tablo: str, filtre: str = "") -> list:
     except Exception:
         return []
 
-def sb_insert(tablo: str, veri: dict) -> bool:
+def sb_insert(tablo, veri):
     try:
         if not sb_url():
             return False
@@ -183,7 +154,7 @@ def sb_insert(tablo: str, veri: dict) -> bool:
     except Exception:
         return False
 
-def sb_update(tablo: str, filtre: str, veri: dict) -> bool:
+def sb_update(tablo, filtre, veri):
     try:
         if not sb_url():
             return False
@@ -195,7 +166,7 @@ def sb_update(tablo: str, filtre: str, veri: dict) -> bool:
     except Exception:
         return False
 
-def sb_delete(tablo: str, filtre: str) -> bool:
+def sb_delete(tablo, filtre):
     try:
         if not sb_url():
             return False
@@ -205,18 +176,17 @@ def sb_delete(tablo: str, filtre: str) -> bool:
     except Exception:
         return False
 
-def sb_to_df(rows: list, kolon_map: dict = None) -> pd.DataFrame:
+def sb_to_df(rows, kolon_map=None):
     if not rows:
         return pd.DataFrame()
     df = pd.DataFrame(rows)
-    df = df.drop(columns=[c for c in ["id","created_at"] if c in df.columns])
+    df = df.drop(columns=[c for c in ["id", "created_at"] if c in df.columns])
     if kolon_map:
         df = df.rename(columns=kolon_map)
-    for col in ["Stok Miktarı","Kritik Seviye","Maksimum Stok","Son Fiyat (TL)",
-                "Çözüm Süresi (Dk)","Malzeme Maliyeti (TL)","İş Gücü Maliyeti (TL)","Toplam Maliyet (TL)"]:
+    for col in ["Stok Miktarı", "Kritik Seviye", "Maksimum Stok", "Son Fiyat (TL)",
+                "Çözüm Süresi (Dk)", "Malzeme Maliyeti (TL)", "İş Gücü Maliyeti (TL)", "Toplam Maliyet (TL)"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    # Tüm object kolonları string'e çevir — Arrow serialization hatalarını önle
     for col in df.columns:
         if df[col].dtype == object:
             df[col] = df[col].astype(str)
@@ -224,51 +194,29 @@ def sb_to_df(rows: list, kolon_map: dict = None) -> pd.DataFrame:
     return df
 
 ARIZA_KOLON_MAP = {
-    "talep_no":            "Talep No",
-    "bolge":               "Bölge",
-    "durum":               "Durum",
-    "oncelik":             "Öncelik",
-    "vardiya":             "Vardiya",
-    "acilis_tarihi":       "Açılış Tarihi",
-    "kapatma_tarihi":      "Kapatma Tarihi",
-    "bildiren":            "Bildiren",
-    "bildiren_departman":  "Bildiren Departman",
-    "mudahale_eden":       "Müdahale Eden",
-    "makine":              "Makine",
-    "ariza_turu":          "Arıza Türü",
-    "alt_kategori":        "Alt Kategori",
-    "ariza_tanimi":        "Arıza Tanımı",
-    "bildirim_saati":      "Bildirim Saati",
-    "ilk_mudahale_saati":  "İlk Müdahale Saati",
-    "cozum_suresi_dk":     "Çözüm Süresi (Dk)",
-    "sla_durumu":          "SLA Durumu",
-    "cozum_aciklamasi":    "Çözüm Açıklaması",
-    "kok_neden":           "Kök Neden",
-    "bes_neden_analizi":   "5 Neden Analizi",
-    "kaizen_onerisi":      "Kaizen Önerisi",
-    "kullanilan_malzemeler": "Kullanılan Malzemeler",
-    "malzeme_maliyeti":    "Malzeme Maliyeti (TL)",
-    "isguc_maliyeti":      "İş Gücü Maliyeti (TL)",
-    "toplam_maliyet":      "Toplam Maliyet (TL)",
-    "fotograf_notu":       "Fotoğraf Notu",
-    "kapatma_onayi":       "Kapatma Onayı",
+    "talep_no": "Talep No", "bolge": "Bölge", "durum": "Durum", "oncelik": "Öncelik",
+    "vardiya": "Vardiya", "acilis_tarihi": "Açılış Tarihi", "kapatma_tarihi": "Kapatma Tarihi",
+    "bildiren": "Bildiren", "bildiren_departman": "Bildiren Departman", "mudahale_eden": "Müdahale Eden",
+    "makine": "Makine", "ariza_turu": "Arıza Türü", "alt_kategori": "Alt Kategori",
+    "ariza_tanimi": "Arıza Tanımı", "bildirim_saati": "Bildirim Saati",
+    "ilk_mudahale_saati": "İlk Müdahale Saati", "cozum_suresi_dk": "Çözüm Süresi (Dk)",
+    "sla_durumu": "SLA Durumu", "cozum_aciklamasi": "Çözüm Açıklaması",
+    "kok_neden": "Kök Neden", "bes_neden_analizi": "5 Neden Analizi",
+    "kaizen_onerisi": "Kaizen Önerisi", "kullanilan_malzemeler": "Kullanılan Malzemeler",
+    "malzeme_maliyeti": "Malzeme Maliyeti (TL)", "isguc_maliyeti": "İş Gücü Maliyeti (TL)",
+    "toplam_maliyet": "Toplam Maliyet (TL)", "fotograf_notu": "Fotoğraf Notu",
+    "kapatma_onayi": "Kapatma Onayı",
 }
 
 STOK_KOLON_MAP = {
-    "malzeme_kodu":   "Malzeme Kodu",
-    "malzeme_adi":    "Malzeme Adı",
-    "kategori":       "Kategori",
-    "birim":          "Birim",
-    "stok_miktari":   "Stok Miktarı",
-    "kritik_seviye":  "Kritik Seviye",
-    "maksimum_stok":  "Maksimum Stok",
-    "son_fiyat":      "Son Fiyat (TL)",
-    "tedarikci":      "Tedarikçi",
-    "son_guncelleme": "Son Güncelleme",
+    "malzeme_kodu": "Malzeme Kodu", "malzeme_adi": "Malzeme Adı", "kategori": "Kategori",
+    "birim": "Birim", "stok_miktari": "Stok Miktarı", "kritik_seviye": "Kritik Seviye",
+    "maksimum_stok": "Maksimum Stok", "son_fiyat": "Son Fiyat (TL)",
+    "tedarikci": "Tedarikçi", "son_guncelleme": "Son Güncelleme",
 }
 
 @st.cache_data(ttl=5)
-def ariza_df_getir() -> pd.DataFrame:
+def ariza_df_getir():
     try:
         rows = sb_select("ariza_kayitlari")
         return sb_to_df(rows, ARIZA_KOLON_MAP)
@@ -276,7 +224,7 @@ def ariza_df_getir() -> pd.DataFrame:
         return pd.DataFrame()
 
 @st.cache_data(ttl=10)
-def stok_df_getir() -> pd.DataFrame:
+def stok_df_getir():
     try:
         rows = sb_select("stok")
         return sb_to_df(rows, STOK_KOLON_MAP)
@@ -284,18 +232,16 @@ def stok_df_getir() -> pd.DataFrame:
         return pd.DataFrame()
 
 @st.cache_data(ttl=60)
-def kullanicilar_getir() -> dict:
+def kullanicilar_getir():
     try:
         rows = sb_select("kullanicilar")
         if not rows:
             return {}
-        return {r["kullanici_adi"]: {"sifre": r["sifre_hash"],
-                                      "rol":   r["rol"],
-                                      "tam_ad":r["tam_ad"]} for r in rows}
+        return {r["kullanici_adi"]: {"sifre": r["sifre_hash"], "rol": r["rol"], "tam_ad": r["tam_ad"]} for r in rows}
     except Exception:
         return {}
 
-def makine_listesi_db() -> dict:
+def makine_listesi_db():
     try:
         rows = sb_select("makine_listesi", "aktif=eq.true")
         if not rows:
@@ -307,7 +253,7 @@ def makine_listesi_db() -> dict:
     except Exception:
         return {}
 
-def ariza_turu_db() -> dict:
+def ariza_turu_db():
     try:
         url = f"{sb_url()}/rest/v1/ariza_turu_listesi?aktif=eq.true&order=kategori.asc,id.asc"
         r = requests.get(url, headers=sb_headers(), timeout=10)
@@ -326,15 +272,15 @@ def ariza_turu_db() -> dict:
     except Exception:
         return {}
 
-def aktif_makine_listesi() -> dict:
+def aktif_makine_listesi():
     db = makine_listesi_db()
     return db if db else MAKINE_LISTESI_BOLGE
 
-def aktif_ariza_turleri() -> dict:
+def aktif_ariza_turleri():
     db = ariza_turu_db()
     return db if db else ARIZA_TURLERI
 
-def checklist_getir(bakim_plani_id: int) -> list:
+def checklist_getir(bakim_plani_id):
     try:
         url = f"{sb_url()}/rest/v1/bakim_checklist?bakim_plani_id=eq.{int(bakim_plani_id)}&aktif=eq.true&order=sira.asc"
         r = requests.get(url, headers=sb_headers(), timeout=10)
@@ -345,7 +291,7 @@ def checklist_getir(bakim_plani_id: int) -> list:
     except Exception:
         return []
 
-def checklist_kayit_getir(talep_no: str) -> list:
+def checklist_kayit_getir(talep_no):
     try:
         url = f"{sb_url()}/rest/v1/bakim_checklist_kayit?ariza_talep_no=eq.{talep_no}&order=id.asc"
         r = requests.get(url, headers=sb_headers(), timeout=10)
@@ -372,229 +318,142 @@ def veritabani_hazirla():
         return
     if not sb_select("stok"):
         baslangic = [
-            {"malzeme_kodu":"M001","malzeme_adi":"VNA Sürüş Tekerleği (225mm)","kategori":"Hareketli Parça","birim":"Adet","stok_miktari":8,"kritik_seviye":2,"maksimum_stok":15,"son_fiyat":850,"tedarikci":"Jungheinrich TR","son_guncelleme":datetime.now().strftime("%d/%m/%Y")},
-            {"malzeme_kodu":"M002","malzeme_adi":"RT Mesafe Sensörü (Sick)","kategori":"Sensör","birim":"Adet","stok_miktari":12,"kritik_seviye":3,"maksimum_stok":20,"son_fiyat":1200,"tedarikci":"Sick Türkiye","son_guncelleme":datetime.now().strftime("%d/%m/%Y")},
-            {"malzeme_kodu":"M003","malzeme_adi":"PLC Dijital Giriş Modülü (Siemens)","kategori":"Elektrik","birim":"Adet","stok_miktari":4,"kritik_seviye":1,"maksimum_stok":8,"son_fiyat":2400,"tedarikci":"Siemens TR","son_guncelleme":datetime.now().strftime("%d/%m/%Y")},
-            {"malzeme_kodu":"M004","malzeme_adi":"Rulman (6204-2RS)","kategori":"Mekanik","birim":"Adet","stok_miktari":25,"kritik_seviye":5,"maksimum_stok":50,"son_fiyat":45,"tedarikci":"SKF Türkiye","son_guncelleme":datetime.now().strftime("%d/%m/%Y")},
-            {"malzeme_kodu":"M005","malzeme_adi":"Hidrolik Yağ ISO-46","kategori":"Sarf","birim":"Litre","stok_miktari":40,"kritik_seviye":10,"maksimum_stok":80,"son_fiyat":180,"tedarikci":"Shell TR","son_guncelleme":datetime.now().strftime("%d/%m/%Y")},
-            {"malzeme_kodu":"M006","malzeme_adi":"Konveyör Kayışı (B-1500)","kategori":"Hareketli Parça","birim":"Metre","stok_miktari":30,"kritik_seviye":5,"maksimum_stok":60,"son_fiyat":95,"tedarikci":"ContiTech","son_guncelleme":datetime.now().strftime("%d/%m/%Y")},
-            {"malzeme_kodu":"M007","malzeme_adi":"Motor Koruma Sigortası (16A)","kategori":"Elektrik","birim":"Adet","stok_miktari":20,"kritik_seviye":5,"maksimum_stok":40,"son_fiyat":35,"tedarikci":"ABB TR","son_guncelleme":datetime.now().strftime("%d/%m/%Y")},
-            {"malzeme_kodu":"M008","malzeme_adi":"Endüstriyel Filtre Elemanı","kategori":"Sarf","birim":"Adet","stok_miktari":15,"kritik_seviye":3,"maksimum_stok":30,"son_fiyat":220,"tedarikci":"Parker TR","son_guncelleme":datetime.now().strftime("%d/%m/%Y")},
+            {"malzeme_kodu": "M001", "malzeme_adi": "VNA Sürüş Tekerleği (225mm)", "kategori": "Hareketli Parça", "birim": "Adet", "stok_miktari": 8, "kritik_seviye": 2, "maksimum_stok": 15, "son_fiyat": 850, "tedarikci": "Jungheinrich TR", "son_guncelleme": datetime.now().strftime("%d/%m/%Y")},
+            {"malzeme_kodu": "M002", "malzeme_adi": "RT Mesafe Sensörü (Sick)", "kategori": "Sensör", "birim": "Adet", "stok_miktari": 12, "kritik_seviye": 3, "maksimum_stok": 20, "son_fiyat": 1200, "tedarikci": "Sick Türkiye", "son_guncelleme": datetime.now().strftime("%d/%m/%Y")},
+            {"malzeme_kodu": "M003", "malzeme_adi": "PLC Dijital Giriş Modülü (Siemens)", "kategori": "Elektrik", "birim": "Adet", "stok_miktari": 4, "kritik_seviye": 1, "maksimum_stok": 8, "son_fiyat": 2400, "tedarikci": "Siemens TR", "son_guncelleme": datetime.now().strftime("%d/%m/%Y")},
+            {"malzeme_kodu": "M004", "malzeme_adi": "Rulman (6204-2RS)", "kategori": "Mekanik", "birim": "Adet", "stok_miktari": 25, "kritik_seviye": 5, "maksimum_stok": 50, "son_fiyat": 45, "tedarikci": "SKF Türkiye", "son_guncelleme": datetime.now().strftime("%d/%m/%Y")},
+            {"malzeme_kodu": "M005", "malzeme_adi": "Hidrolik Yağ ISO-46", "kategori": "Sarf", "birim": "Litre", "stok_miktari": 40, "kritik_seviye": 10, "maksimum_stok": 80, "son_fiyat": 180, "tedarikci": "Shell TR", "son_guncelleme": datetime.now().strftime("%d/%m/%Y")},
+            {"malzeme_kodu": "M006", "malzeme_adi": "Konveyör Kayışı (B-1500)", "kategori": "Hareketli Parça", "birim": "Metre", "stok_miktari": 30, "kritik_seviye": 5, "maksimum_stok": 60, "son_fiyat": 95, "tedarikci": "ContiTech", "son_guncelleme": datetime.now().strftime("%d/%m/%Y")},
+            {"malzeme_kodu": "M007", "malzeme_adi": "Motor Koruma Sigortası (16A)", "kategori": "Elektrik", "birim": "Adet", "stok_miktari": 20, "kritik_seviye": 5, "maksimum_stok": 40, "son_fiyat": 35, "tedarikci": "ABB TR", "son_guncelleme": datetime.now().strftime("%d/%m/%Y")},
+            {"malzeme_kodu": "M008", "malzeme_adi": "Endüstriyel Filtre Elemanı", "kategori": "Sarf", "birim": "Adet", "stok_miktari": 15, "kritik_seviye": 3, "maksimum_stok": 30, "son_fiyat": 220, "tedarikci": "Parker TR", "son_guncelleme": datetime.now().strftime("%d/%m/%Y")},
         ]
         for s in baslangic:
             sb_insert("stok", s)
     if not sb_select("kullanicilar"):
         for k in [
-            {"kullanici_adi":"admin",    "sifre_hash":hashlib.sha256("1905".encode()).hexdigest(),"tam_ad":"Sistem Yöneticisi","rol":"Yönetici"},
-            {"kullanici_adi":"sezer",    "sifre_hash":hashlib.sha256("1905".encode()).hexdigest(),"tam_ad":"Sezer Bey","rol":"Yönetici"},
-            {"kullanici_adi":"teknik01", "sifre_hash":hashlib.sha256("1905".encode()).hexdigest(),"tam_ad":"Teknisyen 1","rol":"Teknisyen"},
-            {"kullanici_adi":"uretim",   "sifre_hash":hashlib.sha256("1905".encode()).hexdigest(),"tam_ad":"Üretim Operatörü","rol":"Operatör"},
+            {"kullanici_adi": "admin",    "sifre_hash": hashlib.sha256("1905".encode()).hexdigest(), "tam_ad": "Sistem Yöneticisi", "rol": "Yönetici"},
+            {"kullanici_adi": "sezer",    "sifre_hash": hashlib.sha256("1905".encode()).hexdigest(), "tam_ad": "Sezer Bey", "rol": "Yönetici"},
+            {"kullanici_adi": "teknik01", "sifre_hash": hashlib.sha256("1905".encode()).hexdigest(), "tam_ad": "Teknisyen 1", "rol": "Teknisyen"},
+            {"kullanici_adi": "uretim",   "sifre_hash": hashlib.sha256("1905".encode()).hexdigest(), "tam_ad": "Üretim Operatörü", "rol": "Operatör"},
         ]:
             sb_insert("kullanicilar", k)
 
 secrets_kontrol()
 veritabani_hazirla()
 
-# Haftalık rapor kontrolü — Pazartesi sabahı otomatik gönderir
+def log_yaz(islem, detay=""):
+    sb_insert("sistem_log", {
+        "zaman":     datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "kullanici": st.session_state.get("aktif_kullanici", "Sistem"),
+        "islem":     islem,
+        "detay":     detay
+    })
+
+def email_gonder(konu, icerik):
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        gonderici = st.secrets["email"]["gonderici"]
+        sifre     = st.secrets["email"]["sifre"]
+        alici_str = st.secrets["email"]["alici"]
+        alicilar  = [a.strip() for a in alici_str.split(",") if a.strip()]
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"[TeknikPro CMMS] {konu}"
+        msg["From"]    = f"TeknikPro CMMS <{gonderici}>"
+        msg["To"]      = ", ".join(alicilar)
+        html = f"""<html><body style="font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;">
+          <div style="max-width:600px;margin:0 auto;background:#1e293b;border-radius:12px;padding:24px;border-left:4px solid #3b82f6;">
+            <h2 style="color:#e2e8f0;margin:0 0 16px 0;">{konu}</h2>
+            <div style="background:#0f172a;border-radius:8px;padding:16px;font-size:14px;line-height:1.8;color:#cbd5e1;white-space:pre-line;">{icerik}</div>
+            <div style="margin-top:20px;font-size:11px;color:#475569;border-top:1px solid #334155;padding-top:12px;">{datetime.now().strftime("%d/%m/%Y %H:%M")} — Adana LM / Tuzla LM</div>
+          </div></body></html>"""
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gonderici, sifre)
+            server.sendmail(gonderici, alicilar, msg.as_string())
+        return True
+    except KeyError:
+        return False
+    except Exception as e:
+        print(f"Email gönderilemedi: {e}")
+        return False
+
+def haftalik_rapor_gonder():
+    try:
+        bugun = date.today()
+        if bugun.weekday() != 0:
+            return
+        hafta_no = bugun.strftime("%Y-W%W")
+        mevcut = sb_select("haftalik_rapor_log", f"hafta=eq.{hafta_no}&durum=eq.Gönderildi")
+        if mevcut:
+            return
+        df_h = ariza_df_getir()
+        if df_h.empty:
+            return
+        gecen_pzt = bugun - timedelta(days=7)
+        gecen_paz = bugun - timedelta(days=1)
+        try:
+            df_h["_t"] = pd.to_datetime(df_h["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
+            df_hafta = df_h[(df_h["_t"] >= gecen_pzt) & (df_h["_t"] <= gecen_paz)]
+        except:
+            df_hafta = df_h
+        toplam_h   = len(df_hafta)
+        acik_h     = len(df_h[df_h["Durum"] == "Açık"])
+        kritik_h   = len(df_h[(df_h["Durum"] == "Açık") & (df_h["Öncelik"].str.startswith("🔴", na=False))])
+        kapali_h   = len(df_hafta[df_hafta["Durum"] == "Kapalı"])
+        sla_asan_h = len(df_hafta[df_hafta["SLA Durumu"].str.contains("Aşıldı", na=False)])
+        sla_oran_h = round((toplam_h - sla_asan_h) / max(toplam_h, 1) * 100, 1)
+        df_kap_h = df_hafta[df_hafta["Durum"] == "Kapalı"].copy()
+        df_kap_h["sure"] = pd.to_numeric(df_kap_h.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        ort_mttr_h   = round(df_kap_h["sure"].mean(), 1) if not df_kap_h.empty else 0
+        toplam_mal_h = pd.to_numeric(df_hafta.get("Toplam Maliyet (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0).sum()
+        en_sorunlu = df_hafta["Makine"].value_counts().head(3).to_dict() if not df_hafta.empty and "Makine" in df_hafta.columns else {}
+        en_sorunlu_txt = "\n".join([f"  • {k}: {v} arıza" for k, v in en_sorunlu.items()]) or "  • Veri yok"
+        kritik_listesi = df_h[(df_h["Durum"] == "Açık") & (df_h["Öncelik"].str.startswith("🔴", na=False))].head(5)
+        kritik_txt = ""
+        for _, r in kritik_listesi.iterrows():
+            kritik_txt += f"  • [{r.get('Talep No', '')}] {r.get('Makine', '')} — {str(r.get('Arıza Tanımı', ''))[:50]}\n"
+        kritik_txt = kritik_txt or "  • Kritik açık talep yok ✅"
+        icerik = f"""Geçen haftanın ({gecen_pzt.strftime('%d/%m/%Y')} - {gecen_paz.strftime('%d/%m/%Y')}) bakım ve arıza özeti:\n\nBu Hafta Açılan: {toplam_h} | Kapatılan: {kapali_h} | SLA Uyum: %{sla_oran_h} | MTTR: {ort_mttr_h} dk\n\nKritik Açık:\n{kritik_txt}\n\nEn Sorunlu Makineler:\n{en_sorunlu_txt}"""
+        konu = f"📊 Haftalık Bakım Raporu — {gecen_pzt.strftime('%d/%m')} - {gecen_paz.strftime('%d/%m/%Y')}"
+        basari = email_gonder(konu, icerik)
+        sb_insert("haftalik_rapor_log", {"gonderim_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"), "hafta": hafta_no, "durum": "Gönderildi" if basari else "Hata"})
+    except Exception as e:
+        print(f"Haftalık rapor hatası: {e}")
+
 try:
     haftalik_rapor_gonder()
 except Exception:
     pass
 
-# =============================================================================
-# YARDIMCI FONKSİYONLAR
-# =============================================================================
-
-def log_yaz(islem: str, detay: str = ""):
-    sb_insert("sistem_log", {
-        "zaman":    datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-        "kullanici": st.session_state.get("aktif_kullanici", "Sistem"),
-        "islem":    islem,
-        "detay":    detay
-    })
-
-def haftalik_rapor_gonder():
-    """Her Pazartesi sabahı otomatik haftalık rapor emaili gönder."""
-    try:
-        bugun = date.today()
-        # Sadece Pazartesi (weekday=0) çalış
-        if bugun.weekday() != 0:
-            return
-        # Bu hafta zaten gönderildi mi?
-        hafta_no = bugun.strftime("%Y-W%W")
-        mevcut = sb_select("haftalik_rapor_log", f"hafta=eq.{hafta_no}&durum=eq.Gönderildi")
-        if mevcut:
-            return  # Bu hafta zaten gönderilmiş
-
-        # Veri topla
-        df_h = ariza_df_getir()
-        if df_h.empty:
-            return
-
-        gecen_pzt  = bugun - timedelta(days=7)
-        gecen_paz  = bugun - timedelta(days=1)
-
-        try:
-            df_h["_t"] = pd.to_datetime(df_h["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
-            df_hafta   = df_h[(df_h["_t"] >= gecen_pzt) & (df_h["_t"] <= gecen_paz)]
-        except:
-            df_hafta = df_h
-
-        toplam_h    = len(df_hafta)
-        acik_h      = len(df_h[df_h["Durum"] == "Açık"])
-        kritik_h    = len(df_h[(df_h["Durum"]=="Açık") & (df_h["Öncelik"].str.startswith("🔴",na=False))])
-        kapali_h    = len(df_hafta[df_hafta["Durum"] == "Kapalı"])
-        sla_asan_h  = len(df_hafta[df_hafta["SLA Durumu"].str.contains("Aşıldı",na=False)])
-        sla_oran_h  = round((toplam_h - sla_asan_h) / max(toplam_h, 1) * 100, 1)
-
-        df_kap_h = df_hafta[df_hafta["Durum"]=="Kapalı"].copy()
-        df_kap_h["sure"] = pd.to_numeric(df_kap_h.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
-        ort_mttr_h = round(df_kap_h["sure"].mean(), 1) if not df_kap_h.empty else 0
-        toplam_mal_h = pd.to_numeric(df_hafta.get("Toplam Maliyet (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0).sum()
-
-        # En sorunlu makine
-        en_sorunlu = df_hafta["Makine"].value_counts().head(3).to_dict() if not df_hafta.empty and "Makine" in df_hafta.columns else {}
-        en_sorunlu_txt = "\n".join([f"  • {k}: {v} arıza" for k,v in en_sorunlu.items()]) or "  • Veri yok"
-
-        # Açık kritik talepler
-        kritik_listesi = df_h[(df_h["Durum"]=="Açık") & (df_h["Öncelik"].str.startswith("🔴",na=False))].head(5)
-        kritik_txt = ""
-        for _, r in kritik_listesi.iterrows():
-            kritik_txt += f"  • [{r.get('Talep No','')}] {r.get('Makine','')} — {str(r.get('Arıza Tanımı',''))[:50]}\n"
-        kritik_txt = kritik_txt or "  • Kritik açık talep yok ✅"
-
-        icerik = f"""
-Merhaba,
-
-Geçen haftanın ({gecen_pzt.strftime('%d/%m/%Y')} - {gecen_paz.strftime('%d/%m/%Y')}) bakım ve arıza özeti aşağıdadır.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 HAFTALIK ÖZET
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Bu Hafta Açılan Talepler : {toplam_h}
-Kapatılan Talepler        : {kapali_h}
-SLA Uyum Oranı           : %{sla_oran_h}
-SLA Aşımı                : {sla_asan_h} talep
-Ortalama MTTR            : {ort_mttr_h} dakika
-Toplam Maliyet           : {toplam_mal_h:,.0f} ₺
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 MEVCUT DURUM (Bugün İtibarıyla)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Toplam Açık Talep  : {acik_h}
-Kritik Açık Talep  : {kritik_h}
-
-Kritik Açık Talepler:
-{kritik_txt}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔴 EN SORUNLU MAKİNELER (Bu Hafta)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-{en_sorunlu_txt}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Sisteme erişmek için: https://teknikv2-78qrqxtnuqyue3bvmk69e2.streamlit.app
-
-TeknikPro CMMS v2.0 — Otomatik Haftalık Rapor
-"""
-        konu = f"📊 Haftalık Bakım Raporu — {gecen_pzt.strftime('%d/%m')} - {gecen_paz.strftime('%d/%m/%Y')}"
-        basari = email_gonder(konu, icerik)
-
-        # Log kaydet
-        sb_insert("haftalik_rapor_log", {
-            "gonderim_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "hafta":           hafta_no,
-            "durum":           "Gönderildi" if basari else "Hata"
-        })
-
-    except Exception as e:
-        print(f"Haftalık rapor hatası: {e}")
-
-def email_gonder(konu: str, icerik: str) -> bool:
-    """Gmail ile bildirim emaili gönder. Secrets yoksa sessizce geç."""
-    try:
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-
-        gonderici = st.secrets["email"]["gonderici"]
-        sifre     = st.secrets["email"]["sifre"]
-        alici_str = st.secrets["email"]["alici"]
-        alicilar  = [a.strip() for a in alici_str.split(",") if a.strip()]
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"[TeknikPro CMMS] {konu}"
-        msg["From"]    = f"TeknikPro CMMS <{gonderici}>"
-        msg["To"]      = ", ".join(alicilar)
-
-        # HTML içerik
-        html = f"""
-        <html><body style="font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;">
-          <div style="max-width:600px;margin:0 auto;background:#1e293b;border-radius:12px;padding:24px;
-                      border-left:4px solid #3b82f6;">
-            <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">
-              TeknikPro CMMS — Otomatik Bildirim
-            </div>
-            <h2 style="color:#e2e8f0;margin:0 0 16px 0;">{konu}</h2>
-            <div style="background:#0f172a;border-radius:8px;padding:16px;font-size:14px;
-                        line-height:1.8;color:#cbd5e1;white-space:pre-line;">
-{icerik}
-            </div>
-            <div style="margin-top:20px;font-size:11px;color:#475569;border-top:1px solid #334155;padding-top:12px;">
-              {datetime.now().strftime("%d/%m/%Y %H:%M")} — Adana LM / Tuzla LM
-            </div>
-          </div>
-        </body></html>
-        """
-
-        msg.attach(MIMEText(html, "html", "utf-8"))
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(gonderici, sifre)
-            server.sendmail(gonderici, alicilar, msg.as_string())
-        return True
-
-    except KeyError:
-        # Secrets tanımlı değil — sessizce geç
-        return False
-    except Exception as e:
-        # Email gönderilemedi — sistemi bloklama
-        print(f"Email gönderilemedi: {e}")
-        return False
-
-def sla_hesapla(oncelik: str, acilis: str, kapanis: str = None) -> dict:
+def sla_hesapla(oncelik, acilis, kapanis=None):
     sla_dk = ARIZA_ONCELIKLERI.get(oncelik, {}).get("sla_dk", 480)
     try:
         ac    = datetime.strptime(acilis, "%d/%m/%Y %H:%M")
         bitis = datetime.strptime(kapanis, "%d/%m/%Y %H:%M") if kapanis else datetime.now()
         gecen = (bitis - ac).total_seconds() / 60
-        return {"gecen_dk": int(gecen), "sla_dk": sla_dk,
-                "oran": round(gecen/sla_dk*100,1),
-                "durum": "✅ SLA İçinde" if gecen<=sla_dk else "⚠️ SLA Aşıldı"}
+        return {"gecen_dk": int(gecen), "sla_dk": sla_dk, "oran": round(gecen / sla_dk * 100, 1),
+                "durum": "✅ SLA İçinde" if gecen <= sla_dk else "⚠️ SLA Aşıldı"}
     except:
         return {"gecen_dk": 0, "sla_dk": sla_dk, "oran": 0, "durum": "—"}
 
-def talep_no_uret() -> str:
+def talep_no_uret():
     yil = datetime.now().year
     ay  = datetime.now().month
     prefix = f"ARZ-{yil}{ay:02d}-"
     rows = sb_select("ariza_kayitlari", f"talep_no=like.{prefix}*")
     return f"{prefix}{len(rows)+1:03d}"
 
-def sifre_hashle(sifre: str) -> str:
+def sifre_hashle(sifre):
     return hashlib.sha256(sifre.encode()).hexdigest()
 
-def kullanicilari_yukle() -> dict:
+def kullanicilari_yukle():
     try:
         k = kullanicilar_getir()
         return k if k else KULLANICILAR_DEFAULT
     except:
         return KULLANICILAR_DEFAULT
-
 
 # =============================================================================
 # SAYFA KONFİGÜRASYONU & CSS
@@ -606,38 +465,13 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; font-size: 14px; }
-
-/* ── ANA ARKA PLAN — Koyu Mor ──────────────────────────────── */
 .stApp { background: linear-gradient(160deg, #2D0052 0%, #3D0066 50%, #2D0052 100%) !important; }
-
-/* ── SIDEBAR ───────────────────────────────────────────────── */
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #1E0038 0%, #2D0052 100%) !important;
-    border-right: 2px solid rgba(255,215,0,0.2) !important;
-}
+[data-testid="stSidebar"] { background: linear-gradient(180deg, #1E0038 0%, #2D0052 100%) !important; border-right: 2px solid rgba(255,215,0,0.2) !important; }
 [data-testid="stSidebar"] * { color: #E8D5FF !important; }
 [data-testid="stSidebar"] h1,[data-testid="stSidebar"] h2,[data-testid="stSidebar"] h3 { color: #FFD700 !important; }
-
-/* ── METRİK KARTLAR ────────────────────────────────────────── */
-[data-testid="metric-container"] {
-    background: rgba(61,0,102,0.8) !important;
-    border: 1px solid rgba(255,215,0,0.25) !important;
-    border-radius: 12px !important;
-    padding: 16px 20px !important;
-}
-[data-testid="metric-container"] label {
-    color: #C89EE8 !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    text-transform: uppercase;
-}
-[data-testid="metric-container"] [data-testid="stMetricValue"] {
-    color: #FFD700 !important;
-    font-size: 28px !important;
-    font-weight: 800 !important;
-}
-
-/* ── BAŞLIKLAR ─────────────────────────────────────────────── */
+[data-testid="metric-container"] { background: rgba(61,0,102,0.8) !important; border: 1px solid rgba(255,215,0,0.25) !important; border-radius: 12px !important; padding: 16px 20px !important; }
+[data-testid="metric-container"] label { color: #C89EE8 !important; font-size: 12px !important; font-weight: 600 !important; text-transform: uppercase; }
+[data-testid="metric-container"] [data-testid="stMetricValue"] { color: #FFD700 !important; font-size: 28px !important; font-weight: 800 !important; }
 h1 { color: #FFD700 !important; font-weight: 800 !important; font-size: 26px !important; }
 h2 { color: #FFD700 !important; font-weight: 700 !important; }
 h3 { color: #E8D5FF !important; font-weight: 600 !important; }
@@ -649,296 +483,71 @@ td, th { color: #E8D5FF !important; }
 th { color: #FFD700 !important; font-weight: 700 !important; }
 p, span, li { color: #E8D5FF !important; }
 label { color: #C89EE8 !important; font-size: 13px !important; }
-
-/* ── SEKMELER ──────────────────────────────────────────────── */
-[data-testid="stTabs"] [role="tablist"] {
-    background: rgba(30,0,56,0.8) !important;
-    border-radius: 10px !important;
-    padding: 4px !important;
-    border: 1px solid rgba(255,215,0,0.2) !important;
-}
-[data-testid="stTabs"] [role="tab"] {
-    color: #9B6FBF !important;
-    font-weight: 500 !important;
-    font-size: 13px !important;
-    border-radius: 8px !important;
-    padding: 8px 16px !important;
-}
-[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
-    background: rgba(255,215,0,0.15) !important;
-    color: #FFD700 !important;
-    border: 1px solid rgba(255,215,0,0.4) !important;
-    font-weight: 700 !important;
-}
-
-/* ── FORM ALANLARI ─────────────────────────────────────────── */
-[data-testid="stTextInput"] input,
-[data-testid="stTextArea"] textarea {
-    background: rgba(30,0,56,0.9) !important;
-    border: 1px solid rgba(255,215,0,0.25) !important;
-    border-radius: 8px !important;
-    color: #F5F0FF !important;
-}
-[data-testid="stTextInput"] input:focus,
-[data-testid="stTextArea"] textarea:focus {
-    border-color: rgba(255,215,0,0.6) !important;
-    box-shadow: 0 0 0 3px rgba(255,215,0,0.1) !important;
-}
-
-/* ── DROPDOWN ──────────────────────────────────────────────── */
+[data-testid="stTabs"] [role="tablist"] { background: rgba(30,0,56,0.8) !important; border-radius: 10px !important; padding: 4px !important; border: 1px solid rgba(255,215,0,0.2) !important; }
+[data-testid="stTabs"] [role="tab"] { color: #9B6FBF !important; font-weight: 500 !important; font-size: 13px !important; border-radius: 8px !important; padding: 8px 16px !important; }
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] { background: rgba(255,215,0,0.15) !important; color: #FFD700 !important; border: 1px solid rgba(255,215,0,0.4) !important; font-weight: 700 !important; }
+[data-testid="stTextInput"] input, [data-testid="stTextArea"] textarea { background: rgba(30,0,56,0.9) !important; border: 1px solid rgba(255,215,0,0.25) !important; border-radius: 8px !important; color: #F5F0FF !important; }
+[data-testid="stTextInput"] input:focus, [data-testid="stTextArea"] textarea:focus { border-color: rgba(255,215,0,0.6) !important; box-shadow: 0 0 0 3px rgba(255,215,0,0.1) !important; }
 [data-baseweb="popover"],[data-baseweb="popover"] * { background-color: #2D0052 !important; color: #F5F0FF !important; }
 ul[role="listbox"] { background-color: #2D0052 !important; border: 1px solid rgba(255,215,0,0.3) !important; border-radius: 8px !important; }
 li[role="option"] { background-color: #2D0052 !important; color: #E8D5FF !important; }
 li[role="option"]:hover,li[role="option"][aria-selected="true"] { background-color: #4A0080 !important; color: #FFD700 !important; }
-[data-baseweb="menu"] { background-color: #2D0052 !important; border: 1px solid rgba(255,215,0,0.3) !important; border-radius: 8px !important; }
-[data-baseweb="menu"] li { color: #E8D5FF !important; background-color: #2D0052 !important; }
-[data-baseweb="menu"] li:hover { background-color: #4A0080 !important; color: #FFD700 !important; }
-[data-testid="stSelectbox"] [data-baseweb="select"] span,
-[data-testid="stSelectbox"] [data-baseweb="select"] div { color: #F5F0FF !important; background-color: transparent !important; }
-
-/* ── BUTONLAR ──────────────────────────────────────────────── */
-.stButton > button {
-    background: linear-gradient(135deg, #5C0099, #7B00CC) !important;
-    color: #FFD700 !important;
-    border: 1px solid rgba(255,215,0,0.3) !important;
-    border-radius: 8px !important;
-    font-weight: 700 !important;
-    transition: all 0.2s !important;
-}
-.stButton > button:hover {
-    background: linear-gradient(135deg, #FFD700, #FFC200) !important;
-    color: #2D0052 !important;
-    border-color: #FFD700 !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 16px rgba(255,215,0,0.3) !important;
-}
-[data-testid="stFormSubmitButton"] > button {
-    background: linear-gradient(135deg, #FFD700, #FFC200) !important;
-    color: #2D0052 !important;
-    border: none !important;
-    width: 100% !important;
-    font-weight: 800 !important;
-    border-radius: 10px !important;
-    font-size: 15px !important;
-}
-[data-testid="stFormSubmitButton"] > button:hover {
-    background: linear-gradient(135deg, #E91E8C, #C2185B) !important;
-    color: #ffffff !important;
-    box-shadow: 0 4px 16px rgba(233,30,140,0.4) !important;
-}
-[data-testid="stDownloadButton"] > button {
-    background: rgba(61,0,102,0.8) !important;
-    border: 1px solid rgba(255,215,0,0.3) !important;
-    color: #FFD700 !important;
-    border-radius: 8px !important;
-}
-
-/* ── TABLO / DATAFRAME ─────────────────────────────────────── */
-[data-testid="stDataFrame"] {
-    border: 1px solid rgba(255,215,0,0.15) !important;
-    border-radius: 12px !important;
-}
-
-/* ── BİLDİRİMLER ───────────────────────────────────────────── */
+.stButton > button { background: linear-gradient(135deg, #5C0099, #7B00CC) !important; color: #FFD700 !important; border: 1px solid rgba(255,215,0,0.3) !important; border-radius: 8px !important; font-weight: 700 !important; transition: all 0.2s !important; }
+.stButton > button:hover { background: linear-gradient(135deg, #FFD700, #FFC200) !important; color: #2D0052 !important; border-color: #FFD700 !important; transform: translateY(-1px) !important; box-shadow: 0 4px 16px rgba(255,215,0,0.3) !important; }
+[data-testid="stFormSubmitButton"] > button { background: linear-gradient(135deg, #FFD700, #FFC200) !important; color: #2D0052 !important; border: none !important; width: 100% !important; font-weight: 800 !important; border-radius: 10px !important; font-size: 15px !important; }
+[data-testid="stFormSubmitButton"] > button:hover { background: linear-gradient(135deg, #E91E8C, #C2185B) !important; color: #ffffff !important; box-shadow: 0 4px 16px rgba(233,30,140,0.4) !important; }
+[data-testid="stDownloadButton"] > button { background: rgba(61,0,102,0.8) !important; border: 1px solid rgba(255,215,0,0.3) !important; color: #FFD700 !important; border-radius: 8px !important; }
+[data-testid="stDataFrame"] { border: 1px solid rgba(255,215,0,0.15) !important; border-radius: 12px !important; }
 [data-testid="stAlert"] { border-radius: 10px !important; border-left-width: 4px !important; }
-
-/* ── EXPANDER ──────────────────────────────────────────────── */
-[data-testid="stExpander"] {
-    background: rgba(61,0,102,0.5) !important;
-    border: 1px solid rgba(255,215,0,0.15) !important;
-    border-radius: 10px !important;
-}
+[data-testid="stExpander"] { background: rgba(61,0,102,0.5) !important; border: 1px solid rgba(255,215,0,0.15) !important; border-radius: 10px !important; }
 [data-testid="stExpander"] summary { color: #FFD700 !important; font-weight: 600 !important; }
-
-/* ── NUMBER INPUT ──────────────────────────────────────────── */
-[data-testid="stNumberInput"] input {
-    background: rgba(30,0,56,0.9) !important;
-    border: 1px solid rgba(255,215,0,0.25) !important;
-    border-radius: 8px !important;
-    color: #F5F0FF !important;
-}
-
-/* ── ÇİZGİ ─────────────────────────────────────────────────── */
+[data-testid="stNumberInput"] input { background: rgba(30,0,56,0.9) !important; border: 1px solid rgba(255,215,0,0.25) !important; border-radius: 8px !important; color: #F5F0FF !important; }
 hr { border-color: rgba(255,215,0,0.15) !important; }
-
-/* ── ÖZEL KARTLAR ──────────────────────────────────────────── */
-.durum-karti {
-    background: rgba(61,0,102,0.7);
-    border: 1px solid rgba(255,215,0,0.2);
-    border-radius: 12px;
-    padding: 16px 20px;
-    margin-bottom: 12px;
-}
-.kritik-banner {
-    background: linear-gradient(135deg, rgba(233,30,140,0.15), rgba(180,0,100,0.1));
-    border: 1px solid rgba(233,30,140,0.5);
-    border-left: 4px solid #E91E8C;
-    border-radius: 10px;
-    padding: 14px 18px;
-    margin: 8px 0 16px 0;
-}
+.durum-karti { background: rgba(61,0,102,0.7); border: 1px solid rgba(255,215,0,0.2); border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; }
+.kritik-banner { background: linear-gradient(135deg, rgba(233,30,140,0.15), rgba(180,0,100,0.1)); border: 1px solid rgba(233,30,140,0.5); border-left: 4px solid #E91E8C; border-radius: 10px; padding: 14px 18px; margin: 8px 0 16px 0; }
 .sla-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .sla-ok   { background: rgba(255,215,0,0.15); border:1px solid rgba(255,215,0,0.4); color:#FFD700; }
 .sla-warn { background: rgba(233,30,140,0.15); border:1px solid rgba(233,30,140,0.4); color:#E91E8C; }
-
-/* ── PROGRESS BAR ──────────────────────────────────────────── */
 [data-testid="stProgress"] > div > div { background: #FFD700 !important; }
-
-/* ── RADIO ─────────────────────────────────────────────────── */
 [data-testid="stRadio"] label { color: #E8D5FF !important; }
+
 /* ── STREAMLIT TOOLBAR GİZLE ───────────────────────────────── */
 header[data-testid="stHeader"] { display: none !important; }
 [data-testid="stToolbar"] { display: none !important; }
+
 /* ── MOBİL OPTİMİZASYON ────────────────────────────────────── */
 @media (max-width: 768px) {
-    /* Genel padding azalt */
     .main .block-container { padding: 8px 12px !important; }
-
-    /* Tüm yazılar daha görünür */
     p, span, div, li { color: #F0E8FF !important; font-size: 14px !important; }
     label { color: #FFD700 !important; font-size: 13px !important; font-weight: 600 !important; margin-bottom: 4px !important; }
-
-    /* Input kutucukları — sadece dış wrapper'a border, iç elemana yok */
-    [data-testid="stTextInput"] > div {
-        background: rgba(30,0,56,0.95) !important;
-        border: 2px solid rgba(255,215,0,0.5) !important;
-        border-radius: 10px !important;
-    }
-    [data-testid="stTextInput"] input {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        min-height: 44px !important;
-        font-size: 16px !important;
-        color: #FFFFFF !important;
-        padding: 10px 12px !important;
-    }
-    [data-testid="stTextArea"] > div {
-        background: rgba(30,0,56,0.95) !important;
-        border: 2px solid rgba(255,215,0,0.5) !important;
-        border-radius: 10px !important;
-    }
-    [data-testid="stTextArea"] textarea {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        font-size: 15px !important;
-        color: #FFFFFF !important;
-        padding: 10px 12px !important;
-    }
-    /* Selectbox — sadece dış wrapper */
-    [data-testid="stSelectbox"] > div > div {
-        background: rgba(30,0,56,0.95) !important;
-        border: 2px solid rgba(255,215,0,0.5) !important;
-        border-radius: 10px !important;
-        min-height: 44px !important;
-    }
-    [data-testid="stSelectbox"] > div > div > div {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-    [data-testid="stSelectbox"] span,
-    [data-testid="stSelectbox"] p { color: #FFFFFF !important; font-size: 15px !important; }
-
-    /* Number input */
-    [data-testid="stNumberInput"] > div {
-        background: rgba(30,0,56,0.95) !important;
-        border: 2px solid rgba(255,215,0,0.5) !important;
-        border-radius: 10px !important;
-    }
-    [data-testid="stNumberInput"] input {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        min-height: 44px !important;
-        font-size: 16px !important;
-        color: #FFFFFF !important;
-    }
-    /* Time input */
-    [data-testid="stTimeInput"] > div {
-        background: rgba(30,0,56,0.95) !important;
-        border: 2px solid rgba(255,215,0,0.5) !important;
-        border-radius: 10px !important;
-    }
-    [data-testid="stTimeInput"] input {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        min-height: 44px !important;
-        font-size: 16px !important;
-        color: #FFFFFF !important;
-    }
-
-    /* Butonlar */
-    .stButton > button {
-        min-height: 48px !important;
-        font-size: 15px !important;
-        padding: 12px 16px !important;
-    }
-    [data-testid="stFormSubmitButton"] > button {
-        min-height: 52px !important;
-        font-size: 16px !important;
-        font-weight: 800 !important;
-        padding: 14px !important;
-    }
-
-    /* Başlıklar parlak */
+    [data-testid="stTextInput"] > div { background: rgba(30,0,56,0.95) !important; border: 2px solid rgba(255,215,0,0.5) !important; border-radius: 10px !important; }
+    [data-testid="stTextInput"] input { background: transparent !important; border: none !important; box-shadow: none !important; min-height: 44px !important; font-size: 16px !important; color: #FFFFFF !important; padding: 10px 12px !important; }
+    [data-testid="stTextArea"] > div { background: rgba(30,0,56,0.95) !important; border: 2px solid rgba(255,215,0,0.5) !important; border-radius: 10px !important; }
+    [data-testid="stTextArea"] textarea { background: transparent !important; border: none !important; box-shadow: none !important; font-size: 15px !important; color: #FFFFFF !important; padding: 10px 12px !important; }
+    [data-testid="stSelectbox"] > div > div { background: rgba(30,0,56,0.95) !important; border: 2px solid rgba(255,215,0,0.5) !important; border-radius: 10px !important; min-height: 44px !important; }
+    [data-testid="stSelectbox"] > div > div > div { background: transparent !important; border: none !important; box-shadow: none !important; }
+    [data-testid="stSelectbox"] span, [data-testid="stSelectbox"] p { color: #FFFFFF !important; font-size: 15px !important; }
+    [data-testid="stNumberInput"] > div { background: rgba(30,0,56,0.95) !important; border: 2px solid rgba(255,215,0,0.5) !important; border-radius: 10px !important; }
+    [data-testid="stNumberInput"] input { background: transparent !important; border: none !important; box-shadow: none !important; min-height: 44px !important; font-size: 16px !important; color: #FFFFFF !important; }
+    [data-testid="stTimeInput"] > div { background: rgba(30,0,56,0.95) !important; border: 2px solid rgba(255,215,0,0.5) !important; border-radius: 10px !important; }
+    [data-testid="stTimeInput"] input { background: transparent !important; border: none !important; box-shadow: none !important; min-height: 44px !important; font-size: 16px !important; color: #FFFFFF !important; }
+    .stButton > button { min-height: 48px !important; font-size: 15px !important; padding: 12px 16px !important; }
+    [data-testid="stFormSubmitButton"] > button { min-height: 52px !important; font-size: 16px !important; font-weight: 800 !important; padding: 14px !important; }
     h1 { color: #FFD700 !important; font-size: 18px !important; margin-bottom: 4px !important; }
     h2 { color: #FFD700 !important; font-size: 16px !important; }
     h3 { color: #F0E8FF !important; font-size: 15px !important; }
     h4 { color: #F0E8FF !important; font-size: 14px !important; }
-
-    /* Strong / bold yazılar */
     strong { color: #FFD700 !important; }
-
-    /* Boşlukları azalt */
     [data-testid="stVerticalBlock"] > div { gap: 6px !important; }
-
-    /* Tab yazıları */
-    [data-testid="stTabs"] [role="tab"] {
-        font-size: 10px !important;
-        padding: 5px 8px !important;
-        color: #C89EE8 !important;
-    }
-    [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
-        color: #FFD700 !important;
-        font-weight: 700 !important;
-    }
-
-    /* Metrikler */
+    [data-testid="stTabs"] [role="tab"] { font-size: 10px !important; padding: 5px 8px !important; color: #C89EE8 !important; }
+    [data-testid="stTabs"] [role="tab"][aria-selected="true"] { color: #FFD700 !important; font-weight: 700 !important; }
     [data-testid="metric-container"] { padding: 10px 12px !important; }
     [data-testid="metric-container"] label { color: #C89EE8 !important; font-size: 11px !important; }
-    [data-testid="metric-container"] [data-testid="stMetricValue"] {
-        font-size: 22px !important;
-        color: #FFD700 !important;
-    }
-
-    /* Caption */
+    [data-testid="metric-container"] [data-testid="stMetricValue"] { font-size: 22px !important; color: #FFD700 !important; }
     [data-testid="stCaptionContainer"] p { font-size: 11px !important; color: #9B6FBF !important; }
-
-    /* Info/warning/error kutuları */
     [data-testid="stAlert"] p { color: #FFFFFF !important; font-size: 14px !important; }
 }
 </style>
-""", unsafe_allow_html=True)
-
-# Dropdown JS fix
-st.markdown("""
-<script>
-(function(){
-  var css = `[data-baseweb="popover"]{background:#1e293b!important;}
-  li[role="option"]{background:#1e293b!important;color:#e2e8f0!important;}
-  li[role="option"]:hover{background:#2d4a6e!important;color:#fff!important;}`;
-  var s=document.createElement("style");s.textContent=css;document.head.appendChild(s);
-  new MutationObserver(function(){
-    document.querySelectorAll('li[role="option"]').forEach(function(el){
-      el.style.setProperty("background-color","#1e293b","important");
-      el.style.setProperty("color","#e2e8f0","important");
-    });
-  }).observe(document.body,{childList:true,subtree:true});
-})();
-</script>
 """, unsafe_allow_html=True)
 
 # =============================================================================
@@ -970,8 +579,7 @@ def sidebar_giris():
             tam_ad = st.session_state.aktif_tam_ad
             rol    = st.session_state.aktif_rol
             st.markdown(f"""
-            <div style="background:rgba(30,58,138,0.2);border:1px solid rgba(99,179,237,0.25);
-                        border-radius:10px;padding:14px 16px;margin-bottom:8px;">
+            <div style="background:rgba(30,58,138,0.2);border:1px solid rgba(99,179,237,0.25);border-radius:10px;padding:14px 16px;margin-bottom:8px;">
               <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">AKTİF OTURUM</div>
               <div style="font-size:15px;color:#e2e8f0;font-weight:600;">👤 {tam_ad}</div>
               <div style="font-size:12px;color:#93c5fd;margin-top:4px;">🏷️ {rol}</div>
@@ -985,15 +593,15 @@ def sidebar_giris():
             tick();setInterval(tick,1000);</script>""", height=24)
             if st.button("🚪 Çıkış Yap", use_container_width=True):
                 log_yaz("ÇIKIŞ", f"{tam_ad} sistemden çıktı")
-                for k in ["oturum_acik","aktif_kullanici","aktif_tam_ad","aktif_rol"]:
+                for k in ["oturum_acik", "aktif_kullanici", "aktif_tam_ad", "aktif_rol"]:
                     st.session_state.pop(k, None)
                 st.rerun()
 
-def yetkili_mi(min_rol="Operatör") -> bool:
-    ROL = {"Yönetici":3,"Teknisyen":2,"Operatör":1}
-    return ROL.get(st.session_state.get("aktif_rol",""),0) >= ROL.get(min_rol,99)
+def yetkili_mi(min_rol="Operatör"):
+    ROL = {"Yönetici": 3, "Teknisyen": 2, "Operatör": 1}
+    return ROL.get(st.session_state.get("aktif_rol", ""), 0) >= ROL.get(min_rol, 99)
 
-def giris_gerektir(min_rol="Teknisyen") -> bool:
+def giris_gerektir(min_rol="Teknisyen"):
     if not st.session_state.get("oturum_acik", False):
         st.markdown("""<div style="text-align:center;padding:60px 20px;">
           <div style="font-size:48px;">🔒</div>
@@ -1020,8 +628,8 @@ with st.sidebar:
     try:
         df_sb = ariza_df_getir()
         if not df_sb.empty and "Durum" in df_sb.columns:
-            _acik   = len(df_sb[df_sb["Durum"]=="Açık"])
-            _kritik = len(df_sb[(df_sb["Durum"]=="Açık") & (df_sb["Öncelik"].str.startswith("🔴",na=False))])
+            _acik   = len(df_sb[df_sb["Durum"] == "Açık"])
+            _kritik = len(df_sb[(df_sb["Durum"] == "Açık") & (df_sb["Öncelik"].str.startswith("🔴", na=False))])
         else:
             _acik, _kritik = 0, 0
         st.markdown(f"""
@@ -1053,19 +661,10 @@ with st.sidebar:
 
 sidebar_giris()
 
-# ── Sidebar QR Kod Girişi ─────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("---")
-    st.markdown("""<div style='font-size:11px;font-weight:700;text-transform:uppercase;
-        letter-spacing:0.08em;color:#3b82f6;padding-left:4px;margin-bottom:8px;'>
-        📱 HIZLI ARIZA BİLDİRİM</div>""", unsafe_allow_html=True)
-    qr_kod_giris = st.text_input(
-        "Makine Kodu",
-        placeholder="Örn: VNA1",
-        help="Makine üzerindeki kodu yazın — Enter'a basın",
-        key="sidebar_qr_kod",
-        label_visibility="collapsed"
-    ).strip().upper()
+    st.markdown("""<div style='font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#3b82f6;padding-left:4px;margin-bottom:8px;'>📱 HIZLI ARIZA BİLDİRİM</div>""", unsafe_allow_html=True)
+    qr_kod_giris = st.text_input("Makine Kodu", placeholder="Örn: VNA1", help="Makine üzerindeki kodu yazın — Enter'a basın", key="sidebar_qr_kod", label_visibility="collapsed").strip().upper()
     st.caption("👆 Makine kodunu yazıp Enter'a basın")
     if qr_kod_giris:
         try:
@@ -1080,14 +679,12 @@ with st.sidebar:
         except:
             pass
 
-
 st.markdown("""
 <div style="margin-bottom:24px;">
   <h1 style="margin:0;padding:0;">🛡️ Teknik Bakım & Arıza Yönetim Sistemi</h1>
   <p style="color:#475569;font-size:13px;margin-top:4px;">Computerized Maintenance Management System — Endüstriyel TPM Platformu</p>
 </div>""", unsafe_allow_html=True)
 
-# QR kod session state kontrolü
 _goto_yeni = st.session_state.get("goto_yeni_talep", False)
 if _goto_yeni:
     st.session_state["goto_yeni_talep"] = False
@@ -1096,22 +693,18 @@ if _goto_yeni:
     function clickYeniTalep() {
         var tabs = window.parent.document.querySelectorAll('[role="tab"]');
         for (var i = 0; i < tabs.length; i++) {
-            if (tabs[i].innerText.indexOf("Yeni Talep") >= 0) {
-                tabs[i].click();
-                return;
-            }
+            if (tabs[i].innerText.indexOf("Yeni Talep") >= 0) { tabs[i].click(); return; }
         }
     }
     setTimeout(clickYeniTalep, 300);
     setTimeout(clickYeniTalep, 800);
     setTimeout(clickYeniTalep, 1500);
-    </script>
-    """, height=0)
+    </script>""", height=0)
 
 tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_oee, tab_ai, tab_twin, tab_ayar = st.tabs([
-    "📊 Canlı Pano","➕ Yeni Talep Aç","✅ Talep Kapat",
-    "📋 Raporlama & Arşiv","📦 Stok Yönetimi","🔧 Bakım Planları",
-    "📈 OEE Analizi","🤖 AI Tahmin","🏭 Dijital İkiz","⚙️ Sistem Ayarları"
+    "📊 Canlı Pano", "➕ Yeni Talep Aç", "✅ Talep Kapat",
+    "📋 Raporlama & Arşiv", "📦 Stok Yönetimi", "🔧 Bakım Planları",
+    "📈 OEE Analizi", "🤖 AI Tahmin", "🏭 Dijital İkiz", "⚙️ Sistem Ayarları"
 ])
 
 # =============================================================================
@@ -1119,7 +712,8 @@ tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_oee, tab_ai, 
 # =============================================================================
 
 with tab_pano:
-   if not st.session_state.get("oturum_acik", False):
+    if not st.session_state.get("oturum_acik", False):
+        # ── ANA SAYFA GİRİŞ FORMU (MOBİL UYUMLU) ──
         st.markdown("""
         <div style="text-align:center;padding:40px 20px 20px;">
           <div style="font-size:64px;margin-bottom:12px;">🛡️</div>
@@ -1129,25 +723,25 @@ with tab_pano:
 
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            kullanicilar = kullanicilari_yukle()
+            kullanicilar_login = kullanicilari_yukle()
             with st.form("ana_giris_formu", clear_on_submit=True):
                 st.markdown("<div style='text-align:center;font-size:20px;font-weight:700;color:#FFD700;margin-bottom:16px;'>🔐 Sistem Girişi</div>", unsafe_allow_html=True)
-                k = st.text_input("Kullanıcı Adı", placeholder="kullanici_adi")
-                s = st.text_input("Şifre", type="password", placeholder="••••••")
-                giris = st.form_submit_button("Giriş Yap →", use_container_width=True)
-                if giris:
-                    k = k.strip().lower()
-                    if k in kullanicilar and kullanicilar[k]["sifre"] == sifre_hashle(s):
+                k_input = st.text_input("Kullanıcı Adı", placeholder="kullanici_adi")
+                s_input = st.text_input("Şifre", type="password", placeholder="••••••")
+                giris_btn = st.form_submit_button("Giriş Yap →", use_container_width=True)
+                if giris_btn:
+                    k_input = k_input.strip().lower()
+                    if k_input in kullanicilar_login and kullanicilar_login[k_input]["sifre"] == sifre_hashle(s_input):
                         st.session_state.oturum_acik     = True
-                        st.session_state.aktif_kullanici = k
-                        st.session_state.aktif_tam_ad    = kullanicilar[k]["tam_ad"]
-                        st.session_state.aktif_rol       = kullanicilar[k]["rol"]
-                        log_yaz("GİRİŞ", f"{kullanicilar[k]['tam_ad']} sisteme giriş yaptı")
+                        st.session_state.aktif_kullanici = k_input
+                        st.session_state.aktif_tam_ad    = kullanicilar_login[k_input]["tam_ad"]
+                        st.session_state.aktif_rol       = kullanicilar_login[k_input]["rol"]
+                        log_yaz("GİRİŞ", f"{kullanicilar_login[k_input]['tam_ad']} sisteme giriş yaptı")
                         st.rerun()
-                        else:
+                    else:
                         st.error("❌ Hatalı kullanıcı adı veya şifre.")
     else:
-        col_ref, _ = st.columns([1,8])
+        col_ref, _ = st.columns([1, 8])
         with col_ref:
             if st.button("🔄 Yenile", use_container_width=True):
                 ariza_df_getir.clear()
@@ -1158,26 +752,24 @@ with tab_pano:
         if df.empty or "Durum" not in df.columns:
             st.info("📭 Sistemde henüz kayıt bulunmuyor.")
         else:
-            # ── Veri Hazırla ──────────────────────────────────────────
             toplam   = len(df)
-            acik     = len(df[df["Durum"]=="Açık"])
-            kapali   = len(df[df["Durum"]=="Kapalı"])
-            kritik   = len(df[(df["Durum"]=="Açık") & (df["Öncelik"].str.startswith("🔴",na=False))])
-            sla_asan = len(df[df["SLA Durumu"].str.contains("Aşıldı",na=False)])
+            acik     = len(df[df["Durum"] == "Açık"])
+            kapali   = len(df[df["Durum"] == "Kapalı"])
+            kritik   = len(df[(df["Durum"] == "Açık") & (df["Öncelik"].str.startswith("🔴", na=False))])
+            sla_asan = len(df[df["SLA Durumu"].str.contains("Aşıldı", na=False)])
             bugun    = datetime.now().strftime("%d/%m/%Y")
-            bugun_s  = len(df[df["Açılış Tarihi"].str.startswith(bugun,na=False)]) if "Açılış Tarihi" in df.columns else 0
-            sla_basari = round((toplam - sla_asan) / max(toplam,1)*100, 1)
+            bugun_s  = len(df[df["Açılış Tarihi"].str.startswith(bugun, na=False)]) if "Açılış Tarihi" in df.columns else 0
+            sla_basari = round((toplam - sla_asan) / max(toplam, 1) * 100, 1)
 
-            df_kap = df[df["Durum"]=="Kapalı"].copy()
+            df_kap = df[df["Durum"] == "Kapalı"].copy()
             df_kap["sure"] = pd.to_numeric(df_kap.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
             ort_mttr = round(df_kap["sure"].mean(), 1) if not df_kap.empty else 0
             toplam_maliyet = pd.to_numeric(df.get("Toplam Maliyet (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0).sum()
 
-            # Availability — arıza süresi / toplam çalışma süresi
             try:
                 if not df_kap.empty and "Kapatma Tarihi" in df_kap.columns:
                     df_kap["_t"] = pd.to_datetime(df_kap["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
-                    s7 = df_kap[df_kap["_t"] >= date.today()-timedelta(days=7)]
+                    s7 = df_kap[df_kap["_t"] >= date.today() - timedelta(days=7)]
                     if not s7.empty:
                         makine_sayisi = max(s7["Makine"].nunique(), 1)
                         toplam_plan = 7 * 480 * makine_sayisi
@@ -1190,71 +782,56 @@ with tab_pano:
             except:
                 avail = 0.0
 
-            avail_renk = "#4ade80" if avail>=85 else "#FFD700" if avail>=70 else "#E91E8C"
-
-            # Makine bazlı top 5
+            avail_renk = "#4ade80" if avail >= 85 else "#FFD700" if avail >= 70 else "#E91E8C"
             mak_top = df["Makine"].value_counts().head(5)
             mak_max = max(mak_top.values) if len(mak_top) > 0 else 1
+            onc_say = df[df["Durum"] == "Açık"]["Öncelik"].value_counts() if acik > 0 else pd.Series(dtype=int)
 
-            # Öncelik dağılımı
-            onc_say = df[df["Durum"]=="Açık"]["Öncelik"].value_counts() if acik > 0 else pd.Series(dtype=int)
-
-            # Teknisyen top 4
             df_tek = df_kap[df_kap["Müdahale Eden"].notna() & (df_kap["Müdahale Eden"] != "") & (df_kap["Müdahale Eden"] != "None")].copy() if "Müdahale Eden" in df_kap.columns else pd.DataFrame()
             tek_listesi = []
             if not df_tek.empty:
                 for tek, grp in df_tek.groupby("Müdahale Eden"):
-                    if tek and tek not in ["","None","nan"]:
-                        sla_b = len(grp[grp["SLA Durumu"].str.contains("İçinde",na=False)]) if "SLA Durumu" in grp.columns else 0
-                        sla_o = round(sla_b/max(len(grp),1)*100,0)
+                    if tek and tek not in ["", "None", "nan"]:
+                        sla_b = len(grp[grp["SLA Durumu"].str.contains("İçinde", na=False)]) if "SLA Durumu" in grp.columns else 0
+                        sla_o = round(sla_b / max(len(grp), 1) * 100, 0)
                         ini   = "".join([w[0].upper() for w in tek.split()[:2]])
-                        tek_listesi.append({"ad":tek,"ini":ini,"sayi":len(grp),"ort":round(grp["sure"].mean(),0),"sla":sla_o})
+                        tek_listesi.append({"ad": tek, "ini": ini, "sayi": len(grp), "ort": round(grp["sure"].mean(), 0), "sla": sla_o})
                 tek_listesi = sorted(tek_listesi, key=lambda x: x["sayi"], reverse=True)[:4]
 
-            # Açık talepler
-            adf = df[df["Durum"]=="Açık"].copy()
+            adf = df[df["Durum"] == "Açık"].copy()
             adf_rows = ""
             for _, r in adf.head(5).iterrows():
                 sure_val = ""
                 try:
-                    ac = datetime.strptime(r.get("Açılış Tarihi",""), "%d/%m/%Y %H:%M")
-                    dk = int((datetime.now()-ac).total_seconds()/60)
+                    ac = datetime.strptime(r.get("Açılış Tarihi", ""), "%d/%m/%Y %H:%M")
+                    dk = int((datetime.now() - ac).total_seconds() / 60)
                     sure_val = f"{dk} dk"
                     sure_renk = "#E91E8C" if dk > 480 else "#FFD700"
                 except:
                     sure_val = "—"
                     sure_renk = "#9B6FBF"
 
-                onc = str(r.get("Öncelik",""))
-                if "KRİTİK" in onc: tag_cls = "tag-red"; tag_txt = "KRİTİK"
+                onc = str(r.get("Öncelik", ""))
+                if "KRİTİK" in onc:   tag_cls = "tag-red";    tag_txt = "KRİTİK"
                 elif "YÜKSEK" in onc: tag_cls = "tag-yellow"; tag_txt = "YÜKSEK"
-                elif "ORTA" in onc: tag_cls = "tag-purple"; tag_txt = "ORTA"
-                else: tag_cls = "tag-green"; tag_txt = "DÜŞÜK"
+                elif "ORTA" in onc:   tag_cls = "tag-purple"; tag_txt = "ORTA"
+                else:                 tag_cls = "tag-green";  tag_txt = "DÜŞÜK"
 
                 adf_rows += f"""
-                <div style="display:grid;grid-template-columns:90px 1fr 80px 90px 70px;gap:8px;
-                    font-size:11px;color:#E8D5FF;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;">
-                  <div style="color:#FFD700;font-weight:700;">{r.get("Talep No","")}</div>
-                  <div>{str(r.get("Makine",""))[:20]}</div>
-                  <div><span style="border-radius:12px;padding:2px 8px;font-size:10px;font-weight:700;
-                    {'background:rgba(233,30,140,0.15);color:#E91E8C;border:1px solid rgba(233,30,140,0.3)' if tag_cls=='tag-red' else
-                     'background:rgba(255,215,0,0.15);color:#FFD700;border:1px solid rgba(255,215,0,0.3)' if tag_cls=='tag-yellow' else
-                     'background:rgba(155,111,191,0.15);color:#C89EE8;border:1px solid rgba(155,111,191,0.3)' if tag_cls=='tag-purple' else
-                     'background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.2)'};">
-                    {tag_txt}</span></div>
-                  <div style="color:#9B6FBF;font-size:10px;">{str(r.get("Bölge",""))[:12]}</div>
+                <div style="display:grid;grid-template-columns:90px 1fr 80px 90px 70px;gap:8px;font-size:11px;color:#E8D5FF;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;">
+                  <div style="color:#FFD700;font-weight:700;">{r.get("Talep No", "")}</div>
+                  <div>{str(r.get("Makine", ""))[:20]}</div>
+                  <div><span style="border-radius:12px;padding:2px 8px;font-size:10px;font-weight:700;{'background:rgba(233,30,140,0.15);color:#E91E8C;border:1px solid rgba(233,30,140,0.3)' if tag_cls=='tag-red' else 'background:rgba(255,215,0,0.15);color:#FFD700;border:1px solid rgba(255,215,0,0.3)' if tag_cls=='tag-yellow' else 'background:rgba(155,111,191,0.15);color:#C89EE8;border:1px solid rgba(155,111,191,0.3)' if tag_cls=='tag-purple' else 'background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.2)'};">{tag_txt}</span></div>
+                  <div style="color:#9B6FBF;font-size:10px;">{str(r.get("Bölge", ""))[:12]}</div>
                   <div style="color:{sure_renk};font-weight:700;">{sure_val}</div>
                 </div>"""
 
-            # Teknisyen HTML
             tek_html = ""
             for t in tek_listesi:
                 bar_w = min(int(t["sla"]), 100)
                 tek_html += f"""
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                  <div style="width:34px;height:34px;border-radius:50%;background:rgba(255,215,0,0.15);
-                      border:1px solid rgba(255,215,0,0.3);display:flex;align-items:center;justify-content:center;
-                      font-size:11px;font-weight:800;color:#FFD700;flex-shrink:0;">{t["ini"]}</div>
+                  <div style="width:34px;height:34px;border-radius:50%;background:rgba(255,215,0,0.15);border:1px solid rgba(255,215,0,0.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#FFD700;flex-shrink:0;">{t["ini"]}</div>
                   <div style="flex:1;min-width:0;">
                     <div style="font-size:12px;font-weight:600;color:#E8D5FF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{t["ad"]}</div>
                     <div style="font-size:10px;color:#9B6FBF;">{t["sayi"]} arıza · Ort. {int(t["ort"])} dk</div>
@@ -1268,115 +845,68 @@ with tab_pano:
                   </div>
                 </div>"""
 
-            # Makine bar HTML
             mak_html = ""
-            colors = ["#FFD700","#FFD700","#E91E8C","#E91E8C","#C89EE8"]
-            for i,(mak,val) in enumerate(mak_top.items()):
-                w = int(val/mak_max*100)
-                renk = colors[min(i,4)]
+            colors = ["#FFD700", "#FFD700", "#E91E8C", "#E91E8C", "#C89EE8"]
+            for i, (mak, val) in enumerate(mak_top.items()):
+                w = int(val / mak_max * 100)
+                renk = colors[min(i, 4)]
                 mak_html += f"""
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                   <div style="font-size:10px;color:#9B6FBF;width:70px;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{str(mak)[:10]}</div>
                   <div style="flex:1;background:rgba(255,255,255,0.05);border-radius:4px;height:20px;overflow:hidden;">
-                    <div style="width:{w}%;height:100%;border-radius:4px;background:linear-gradient(90deg,#7B00CC,{renk});
-                        display:flex;align-items:center;justify-content:flex-end;padding-right:6px;">
+                    <div style="width:{w}%;height:100%;border-radius:4px;background:linear-gradient(90deg,#7B00CC,{renk});display:flex;align-items:center;justify-content:flex-end;padding-right:6px;">
                       <span style="font-size:10px;font-weight:700;color:#2D0052;">{val}</span>
                     </div>
                   </div>
                 </div>"""
 
-            # SLA donut
-            sla_ic = round(sla_basari/100*220,1)
-            sla_dis = 220 - sla_ic
+            sla_ic = round(sla_basari / 100 * 220, 1)
+            sla_dis = round(220 - sla_ic, 1)
+            avail_txt = "✅ Hedef üstü" if avail >= 85 else "⚠️ Geliştirilmeli"
 
-            # ── TAM HTML DASHBOARD ────────────────────────────────────
-            # ── TAM HTML DASHBOARD ────────────────────────────────────
-            avail_renk_css = "#4ade80" if avail>=85 else "#FFD700" if avail>=70 else "#E91E8C"
-            avail_txt = "✅ Hedef üstü" if avail>=85 else "⚠️ Geliştirilmeli"
-            sla_ic_val = round(sla_basari/100*220, 1)
-            sla_dis_val = round(220 - sla_ic_val, 1)
-
-            html_dashboard = """
-<style>
+            html_dashboard = """<style>
 .dc{background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.15);border-radius:10px;padding:16px;margin-bottom:0;}
 .dt{font-size:12px;font-weight:700;color:#E8D5FF;margin-bottom:12px;}
 .kpi-lbl{font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;}
 .kpi-val{font-size:32px;font-weight:800;line-height:1;}
 .kpi-sub{font-size:11px;margin-top:5px;}
-</style>
-<div style="padding:4px 0;">
-<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">
-"""
-            html_dashboard += '<div class="dc" style="border-color:rgba(255,215,0,0.25);"><div class="kpi-lbl">📋 Toplam Talep</div>'
-            html_dashboard += f'<div class="kpi-val" style="color:#FFD700;">{toplam}</div>'
-            html_dashboard += f'<div class="kpi-sub" style="color:#4ade80;">+{bugun_s} bugün</div></div>'
+</style><div style="padding:4px 0;">
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;">"""
 
-            html_dashboard += '<div class="dc" style="border-color:rgba(233,30,140,0.3);"><div class="kpi-lbl">🚨 Açık / Kritik</div>'
-            html_dashboard += f'<div class="kpi-val" style="color:#E91E8C;">{acik}</div>'
-            html_dashboard += f'<div class="kpi-sub" style="color:#E91E8C;">{kritik} kritik acil</div></div>'
-
-            html_dashboard += f'<div class="dc"><div class="kpi-lbl">📈 Availability</div>'
-            html_dashboard += f'<div class="kpi-val" style="color:{avail_renk_css};">%{avail}</div>'
-            html_dashboard += f'<div class="kpi-sub" style="color:{avail_renk_css};">{avail_txt}</div></div>'
-
-            html_dashboard += f'<div class="dc"><div class="kpi-lbl">⏱ Ort. MTTR</div>'
-            html_dashboard += f'<div class="kpi-val" style="color:#FFD700;">{int(ort_mttr)}<span style="font-size:14px;color:#9B6FBF;"> dk</span></div>'
-            html_dashboard += '<div class="kpi-sub" style="color:#9B6FBF;">Ortalama tamir süresi</div></div>'
-
-            html_dashboard += f'<div class="dc"><div class="kpi-lbl">💰 Toplam Maliyet</div>'
-            html_dashboard += f'<div style="font-size:24px;font-weight:800;color:#FFD700;line-height:1;">{toplam_maliyet:,.0f}<span style="font-size:12px;color:#9B6FBF;"> ₺</span></div>'
-            html_dashboard += f'<div class="kpi-sub" style="color:#9B6FBF;">SLA Uyum: %{sla_basari}</div></div>'
+            html_dashboard += f'<div class="dc" style="border-color:rgba(255,215,0,0.25);"><div class="kpi-lbl">📋 Toplam Talep</div><div class="kpi-val" style="color:#FFD700;">{toplam}</div><div class="kpi-sub" style="color:#4ade80;">+{bugun_s} bugün</div></div>'
+            html_dashboard += f'<div class="dc" style="border-color:rgba(233,30,140,0.3);"><div class="kpi-lbl">🚨 Açık / Kritik</div><div class="kpi-val" style="color:#E91E8C;">{acik}</div><div class="kpi-sub" style="color:#E91E8C;">{kritik} kritik acil</div></div>'
+            html_dashboard += f'<div class="dc"><div class="kpi-lbl">📈 Availability</div><div class="kpi-val" style="color:{avail_renk};">%{avail}</div><div class="kpi-sub" style="color:{avail_renk};">{avail_txt}</div></div>'
+            html_dashboard += f'<div class="dc"><div class="kpi-lbl">⏱ Ort. MTTR</div><div class="kpi-val" style="color:#FFD700;">{int(ort_mttr)}<span style="font-size:14px;color:#9B6FBF;"> dk</span></div><div class="kpi-sub" style="color:#9B6FBF;">Ortalama tamir süresi</div></div>'
+            html_dashboard += f'<div class="dc"><div class="kpi-lbl">💰 Toplam Maliyet</div><div style="font-size:24px;font-weight:800;color:#FFD700;line-height:1;">{toplam_maliyet:,.0f}<span style="font-size:12px;color:#9B6FBF;"> ₺</span></div><div class="kpi-sub" style="color:#9B6FBF;">SLA Uyum: %{sla_basari}</div></div>'
             html_dashboard += '</div>'
-
-            # Charts row
             html_dashboard += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">'
-
-            # Makine bar
-            html_dashboard += '<div class="dc"><div class="dt">📊 Makine Bazlı Arıza (Top 5)</div>'
-            html_dashboard += mak_html
+            html_dashboard += f'<div class="dc"><div class="dt">📊 Makine Bazlı Arıza (Top 5)</div>{mak_html}</div>'
+            html_dashboard += f'<div class="dc"><div class="dt">⏱ SLA Performansı</div><div style="display:flex;align-items:center;gap:16px;"><svg width="90" height="90" viewBox="0 0 90 90"><circle cx="45" cy="45" r="35" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="16"/><circle cx="45" cy="45" r="35" fill="none" stroke="#FFD700" stroke-width="16" stroke-dasharray="{sla_ic} {sla_dis}" stroke-dashoffset="55" transform="rotate(-90 45 45)"/><text x="45" y="44" text-anchor="middle" font-size="13" font-weight="800" fill="#FFD700">%{sla_basari}</text><text x="45" y="57" text-anchor="middle" font-size="9" fill="#9B6FBF">SLA</text></svg><div><div style="margin-bottom:10px;"><div style="font-size:22px;font-weight:800;color:#4ade80;">{toplam-sla_asan}</div><div style="font-size:10px;color:#9B6FBF;">SLA İçinde</div></div><div><div style="font-size:22px;font-weight:800;color:#E91E8C;">{sla_asan}</div><div style="font-size:10px;color:#9B6FBF;">Aşıldı</div></div></div></div><div style="margin-top:12px;border-top:1px solid rgba(255,215,0,0.1);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;"><div style="background:rgba(255,215,0,0.05);border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#FFD700;">{kapali}</div><div style="font-size:10px;color:#9B6FBF;">Kapatılan</div></div><div style="background:rgba(233,30,140,0.05);border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#E91E8C;">{acik}</div><div style="font-size:10px;color:#9B6FBF;">Açık</div></div></div></div>'
+            html_dashboard += f'<div class="dc"><div class="dt">👨‍🔧 Teknisyen Performansı</div>{tek_html if tek_html else "<div style=\'font-size:12px;color:#9B6FBF;\'>Henüz veri yok.</div>"}</div>'
             html_dashboard += '</div>'
 
-            # SLA Donut
-            html_dashboard += '<div class="dc"><div class="dt">⏱ SLA Performansı</div>'
-            html_dashboard += '<div style="display:flex;align-items:center;gap:16px;">'
-            html_dashboard += f'<svg width="90" height="90" viewBox="0 0 90 90"><circle cx="45" cy="45" r="35" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="16"/><circle cx="45" cy="45" r="35" fill="none" stroke="#FFD700" stroke-width="16" stroke-dasharray="{sla_ic_val} {sla_dis_val}" stroke-dashoffset="55" transform="rotate(-90 45 45)"/><text x="45" y="44" text-anchor="middle" font-size="13" font-weight="800" fill="#FFD700">%{sla_basari}</text><text x="45" y="57" text-anchor="middle" font-size="9" fill="#9B6FBF">SLA</text></svg>'
-            html_dashboard += f'<div><div style="margin-bottom:10px;"><div style="font-size:22px;font-weight:800;color:#4ade80;">{toplam-sla_asan}</div><div style="font-size:10px;color:#9B6FBF;">SLA İçinde</div></div>'
-            html_dashboard += f'<div><div style="font-size:22px;font-weight:800;color:#E91E8C;">{sla_asan}</div><div style="font-size:10px;color:#9B6FBF;">Aşıldı</div></div></div></div>'
-            html_dashboard += f'<div style="margin-top:12px;border-top:1px solid rgba(255,215,0,0.1);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;">'
-            html_dashboard += f'<div style="background:rgba(255,215,0,0.05);border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#FFD700;">{kapali}</div><div style="font-size:10px;color:#9B6FBF;">Kapatılan</div></div>'
-            html_dashboard += f'<div style="background:rgba(233,30,140,0.05);border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#E91E8C;">{acik}</div><div style="font-size:10px;color:#9B6FBF;">Açık</div></div></div>'
-            html_dashboard += '</div>'
-
-            # Teknisyen
-            html_dashboard += '<div class="dc"><div class="dt">👨‍🔧 Teknisyen Performansı</div>'
-            html_dashboard += tek_html if tek_html else '<div style="font-size:12px;color:#9B6FBF;">Henüz veri yok.</div>'
-            html_dashboard += '</div>'
-            html_dashboard += '</div>'
-
-            # Açık talepler tablosu
             krit_badge = f'<span style="background:rgba(233,30,140,0.15);color:#E91E8C;border:1px solid rgba(233,30,140,0.3);border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;margin-left:8px;">{kritik} KRİTİK</span>' if kritik > 0 else ""
-            html_dashboard += f'<div class="dc" style="margin-bottom:16px;">'
-            html_dashboard += f'<div class="dt" style="margin-bottom:10px;">🚨 Aktif Açık Talepler {krit_badge}</div>'
-            html_dashboard += '<div style="display:grid;grid-template-columns:90px 1fr 80px 90px 70px;gap:8px;font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:8px;border-bottom:1px solid rgba(255,215,0,0.1);margin-bottom:4px;">'
-            html_dashboard += '<div>Talep No</div><div>Makine</div><div>Öncelik</div><div>Bölge</div><div>Süre</div></div>'
-            html_dashboard += adf_rows if adf_rows else '<div style="font-size:13px;color:#4ade80;padding:12px 0;">✅ Açık talep bulunmuyor.</div>'
-            html_dashboard += '</div></div>'
+            html_dashboard += f'<div class="dc" style="margin-bottom:16px;"><div class="dt" style="margin-bottom:10px;">🚨 Aktif Açık Talepler {krit_badge}</div><div style="display:grid;grid-template-columns:90px 1fr 80px 90px 70px;gap:8px;font-size:10px;color:#9B6FBF;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:8px;border-bottom:1px solid rgba(255,215,0,0.1);margin-bottom:4px;"><div>Talep No</div><div>Makine</div><div>Öncelik</div><div>Bölge</div><div>Süre</div></div>{adf_rows if adf_rows else "<div style=\'font-size:13px;color:#4ade80;padding:12px 0;\'>✅ Açık talep bulunmuyor.</div>"}</div></div>'
 
             st.markdown(html_dashboard, unsafe_allow_html=True)
 
-            # Bakım uyarıları
             try:
                 df_bp = bakim_df_getir()
                 if not df_bp.empty and "sonraki_bakim_tarihi" in df_bp.columns:
                     df_bp["_snr"] = pd.to_datetime(df_bp["sonraki_bakim_tarihi"], format="%d/%m/%Y", errors="coerce").dt.date
-                    gec = df_bp[df_bp["durum"]=="Gecikmiş"]
-                    yak = df_bp[(df_bp["_snr"]>=date.today()) & (df_bp["_snr"]<=date.today()+timedelta(days=7)) & (df_bp["durum"]=="Bekliyor")]
+                    gec = df_bp[df_bp["durum"] == "Gecikmiş"]
+                    yak = df_bp[(df_bp["_snr"] >= date.today()) & (df_bp["_snr"] <= date.today() + timedelta(days=7)) & (df_bp["durum"] == "Bekliyor")]
                     if not gec.empty:
                         st.error(f"🔴 {len(gec)} gecikmiş bakım var! Bakım Planları sekmesini kontrol edin.")
                     if not yak.empty:
                         st.warning(f"🟡 Bu hafta {len(yak)} bakım planlanmış: {', '.join(yak['makine'].tolist()[:3])}")
             except:
                 pass
+
+
+# =============================================================================
+# SEKME 2: YENİ TALEP
+# =============================================================================
 
 with tab_yeni:
     st.markdown("### ➕ Yeni Arıza Bildirimi Oluştur")
@@ -1387,12 +917,10 @@ with tab_yeni:
     else:
         st.session_state["_talep_gonderildi"] = False
 
-    # QR koddan gelen makine/bölge bilgisini session state'ten oku
     import base64, json as _json
     qr_params = st.query_params
     qr_makine = st.session_state.get("qr_makine", "")
     qr_bolge  = st.session_state.get("qr_bolge", "")
-    # Eski URL parametre desteği
     if not qr_makine:
         try:
             d = qr_params.get("d", "")
@@ -1403,10 +931,8 @@ with tab_yeni:
         except:
             pass
 
-    # Bölge varsayılanı — QR'dan geldiyse onu seç
-    bolge_index  = 0
+    bolge_index = 0
     if qr_bolge:
-        # Emoji olmadan karşılaştır
         for i, b in enumerate(BOLGELER):
             if qr_bolge.strip() in b or b in qr_bolge.strip():
                 bolge_index = i
@@ -1416,7 +942,6 @@ with tab_yeni:
     if qr_makine:
         st.info(f"📱 QR Kod ile bağlandınız — Makine: **{qr_makine}**")
 
-    # Arıza kategorisi ve alt kategori form dışında — birbirine bağlı dinamik güncellenir
     ariza_liste = aktif_ariza_turleri()
     ariza_tur   = st.selectbox("⚡ Arıza Kategorisi *", list(ariza_liste.keys()))
     alt_tur_listesi = ariza_liste.get(ariza_tur, ["Diğer"])
@@ -1425,39 +950,30 @@ with tab_yeni:
     with st.form("yeni_talep_formu", clear_on_submit=True):
         st.markdown("#### 👤 Bildiren Personel")
         bildiren      = st.text_input("Ad Soyad *", placeholder="Ahmet Yıldız")
-        bildiren_dept = st.selectbox("Departman *", ["Üretim","Depo","Lojistik","Bakım","Kalite","İdari","Diğer"])
-        vardiya       = st.selectbox("Vardiya *", ["Gündüz (08:00–16:00)","Akşam (16:00–00:00)","Gece (00:00–08:00)"])
+        bildiren_dept = st.selectbox("Departman *", ["Üretim", "Depo", "Lojistik", "Bakım", "Kalite", "İdari", "Diğer"])
+        vardiya       = st.selectbox("Vardiya *", ["Gündüz (08:00–16:00)", "Akşam (16:00–00:00)", "Gece (00:00–08:00)"])
 
         st.markdown(f"#### 🏭 Arıza Lokasyonu — {secili_bolge}")
         mak_liste = aktif_makine_listesi().get(secili_bolge, MAKINE_LISTESI_BOLGE[secili_bolge])
         mak_index = mak_liste.index(qr_makine) if qr_makine in mak_liste else 0
         makine    = st.selectbox("Makine / Sistem *", mak_liste, index=mak_index)
         oncelik   = st.selectbox("🚨 Kritiklik Seviyesi (SLA) *", list(ARIZA_ONCELIKLERI.keys()))
-        bildirim_saat = st.text_input("🕐 Arıza Fark Edilme Saati",
-            value=st.session_state.get("bil_saat", datetime.now().strftime("%H:%M")),
-            help="SS:DD formatında")
+        bildirim_saat = st.text_input("🕐 Arıza Fark Edilme Saati", value=st.session_state.get("bil_saat", datetime.now().strftime("%H:%M")), help="SS:DD formatında")
 
-        # Seçilen kategori özeti
         st.markdown(f"""
-        <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
-                    border-radius:8px;padding:10px 14px;font-size:13px;margin:4px 0;">
-          ⚡ <strong style="color:#FFD700;">{ariza_tur}</strong>
-          &nbsp;›&nbsp;
-          <span style="color:#C89EE8;">{alt_kategori}</span>
+        <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);border-radius:8px;padding:10px 14px;font-size:13px;margin:4px 0;">
+          ⚡ <strong style="color:#FFD700;">{ariza_tur}</strong> &nbsp;›&nbsp; <span style="color:#C89EE8;">{alt_kategori}</span>
         </div>""", unsafe_allow_html=True)
 
-        ariza_tanimi = st.text_area("📝 Arıza Tanımı *",
-            placeholder="Arızanın belirti ve etkilerini açıklayın...", height=120)
+        ariza_tanimi = st.text_area("📝 Arıza Tanımı *", placeholder="Arızanın belirti ve etkilerini açıklayın...", height=120)
         foto_notu    = st.text_input("📎 Fotoğraf / Referans Notu", placeholder="Opsiyonel")
 
         sla_bilgi = ARIZA_ONCELIKLERI[oncelik]
         st.markdown(f"""
-        <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.15);
-                    border-radius:8px;padding:12px 16px;margin:8px 0;font-size:12px;">
+        <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.15);border-radius:8px;padding:12px 16px;margin:8px 0;font-size:12px;">
           🏭 <strong style="color:#FFD700;">Bölge:</strong> <span style="color:#E8D5FF;">{secili_bolge}</span>
           &nbsp;&nbsp;|&nbsp;&nbsp;
-          ⏱ <strong style="color:#FFD700;">SLA Hedefi:</strong>
-          <strong style="color:#4ade80;">{sla_bilgi["sla_dk"]} dakika</strong>
+          ⏱ <strong style="color:#FFD700;">SLA Hedefi:</strong> <strong style="color:#4ade80;">{sla_bilgi["sla_dk"]} dakika</strong>
         </div>""", unsafe_allow_html=True)
 
         submit_yeni = st.form_submit_button("🚀 Arıza Talebi Oluştur", use_container_width=True)
@@ -1489,40 +1005,17 @@ with tab_yeni:
                     cache_temizle()
                     st.session_state["_talep_gonderildi"] = True
                     log_yaz("YENİ TALEP", f"{no} — {secili_bolge} — {makine} — {bildiren}")
-
-                    # Kritik veya Yüksek arızada email gönder
                     if "KRİTİK" in oncelik or "YÜKSEK" in oncelik:
                         email_gonder(
                             f"🚨 {oncelik[:10]} Arıza — {makine} ({secili_bolge})",
-                            f"""Talep No   : {no}
-Bölge      : {secili_bolge}
-Makine     : {makine}
-Öncelik    : {oncelik}
-Arıza Türü : {ariza_tur} → {alt_kategori}
-Tanım      : {ariza_tanimi.strip()}
-Bildiren   : {bildiren.strip()} ({bildiren_dept})
-Vardiya    : {vardiya}
-Açılış     : {datetime.now().strftime("%d/%m/%Y %H:%M")}
-SLA Hedefi : {sla_bilgi["sla_dk"]} dakika
-
-→ Sisteme giriş: {sb_url().replace("/rest/v1","") if sb_url() else ""}"""
+                            f"Talep No: {no}\nBölge: {secili_bolge}\nMakine: {makine}\nÖncelik: {oncelik}\nTanım: {ariza_tanimi.strip()}\nBildiren: {bildiren.strip()}"
                         )
                     st.success(f"✅ Talep **{no}** oluşturuldu! Bölge: {secili_bolge} | SLA: {sla_bilgi['sla_dk']} dk")
                     time.sleep(1)
                     st.rerun()
                 else:
-                    try:
-                        url = f"{sb_url()}/rest/v1/ariza_kayitlari"
-                        r = requests.post(url, headers=sb_headers(), json={
-                            "talep_no": no, "bolge": secili_bolge, "durum": "Açık",
-                            "oncelik": oncelik, "vardiya": vardiya,
-                            "acilis_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                            "bildiren": bildiren.strip(), "makine": makine,
-                            "ariza_tanimi": ariza_tanimi.strip()
-                        }, timeout=10)
-                        st.error(f"❌ Supabase Hatası {r.status_code}: {r.text[:500]}")
-                    except Exception as e:
-                        st.error(f"❌ Bağlantı hatası: {e}")
+                    st.error("❌ Kayıt başarısız. Supabase bağlantısını kontrol edin.")
+
 
 # =============================================================================
 # SEKME 3: TALEP KAPAT
@@ -1533,16 +1026,13 @@ with tab_kapat:
         pass
     else:
         df_k = ariza_df_getir()
-
         if df_k.empty or "Durum" not in df_k.columns:
             st.success("🎉 Müdahale bekleyen açık talep bulunmuyor.")
         else:
-            acik_k = df_k[df_k["Durum"]=="Açık"].copy()
-
+            acik_k = df_k[df_k["Durum"] == "Açık"].copy()
             if acik_k.empty:
                 st.success("🎉 Müdahale bekleyen açık talep bulunmuyor. Harika iş!")
             else:
-                # Bölge filtresi
                 bf = st.selectbox("🏭 Bölge Filtresi", ["Tüm Bölgeler"] + BOLGELER, key="kapat_bolge")
                 if bf != "Tüm Bölgeler" and "Bölge" in acik_k.columns:
                     acik_k = acik_k[acik_k["Bölge"] == bf]
@@ -1550,11 +1040,11 @@ with tab_kapat:
                 if acik_k.empty:
                     st.info(f"ℹ️ {bf} bölgesinde açık talep bulunmuyor.")
                 else:
-                    krit_k = acik_k[acik_k["Öncelik"].str.startswith("🔴",na=False)]
+                    krit_k = acik_k[acik_k["Öncelik"].str.startswith("🔴", na=False)]
                     if not krit_k.empty:
                         st.markdown(f'''<div class="kritik-banner"><strong style="color:#f87171;">🚨 {len(krit_k)} KRİTİK ARIZA — Acil müdahale bekliyor</strong></div>''', unsafe_allow_html=True)
 
-                    col_s1, _ = st.columns([3,1])
+                    col_s1, _ = st.columns([3, 1])
                     with col_s1:
                         secenekler = acik_k.apply(
                             lambda r: f"[{r['Talep No']}] {str(r.get('Bölge',''))[:10]} | {r['Öncelik'][:2]} {r['Makine']} — {str(r['Arıza Tanımı'])[:50]}",
@@ -1562,15 +1052,15 @@ with tab_kapat:
                         ).tolist()
                         secilen = st.selectbox("📋 Kapatılacak Talebi Seçin", secenekler)
 
-                    secilen_no = secilen.split("]")[0].replace("[","").strip()
-                    talep_df2  = df_k[df_k["Talep No"]==secilen_no]
+                    secilen_no = secilen.split("]")[0].replace("[", "").strip()
+                    talep_df2  = df_k[df_k["Talep No"] == secilen_no]
                     if talep_df2.empty:
                         st.error("Talep bulunamadı.")
                         st.stop()
                     talep = talep_df2.iloc[0]
 
-                    sla_g  = sla_hesapla(talep["Öncelik"], talep["Açılış Tarihi"])
-                    sla_cls= "sla-ok" if "İçinde" in sla_g["durum"] else "sla-warn"
+                    sla_g   = sla_hesapla(talep["Öncelik"], talep["Açılış Tarihi"])
+                    sla_cls = "sla-ok" if "İçinde" in sla_g["durum"] else "sla-warn"
                     st.markdown(f"""
                     <div class="durum-karti">
                       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
@@ -1594,235 +1084,102 @@ with tab_kapat:
                     </div>""", unsafe_allow_html=True)
 
                     st.markdown("#### 🔧 Müdahale & Çözüm Bilgileri")
+                    ISCI_UCRET = 300
 
-                    ISCI_UCRET = 300  # TL/saat
-
-                    # ── MTTR / MTBF Analizi ───────────────────────────
-                    try:
-                        df_all = ariza_df_getir()
-                        makine_adi_mttr = talep.get("Makine", "")
-                        if not df_all.empty and "Durum" in df_all.columns and makine_adi_mttr:
-                            df_makine = df_all[
-                                (df_all["Makine"] == makine_adi_mttr) &
-                                (df_all["Durum"]  == "Kapalı")
-                            ].copy()
-
-                            if not df_makine.empty and "Çözüm Süresi (Dk)" in df_makine.columns:
-                                df_makine["sure"] = pd.to_numeric(df_makine["Çözüm Süresi (Dk)"], errors="coerce")
-                                df_makine = df_makine.dropna(subset=["sure"])
-
-                                if not df_makine.empty:
-                                    mttr = round(df_makine["sure"].mean(), 1)
-                                    toplam_ariza = len(df_makine)
-
-                                    # MTBF: kapatma tarihleri arasındaki ortalama süre
-                                    mtbf_dk   = None
-                                    avail_oran = None
-                                    if "Kapatma Tarihi" in df_makine.columns and len(df_makine) >= 2:
-                                        df_makine["kap"] = pd.to_datetime(
-                                            df_makine["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce"
-                                        )
-                                        df_makine = df_makine.dropna(subset=["kap"]).sort_values("kap")
-                                        farklar = df_makine["kap"].diff().dropna()
-                                        if len(farklar) > 0:
-                                            mtbf_dk    = round(farklar.dt.total_seconds().mean() / 60, 1)
-                                            avail_oran = round(mtbf_dk / (mtbf_dk + mttr) * 100, 1)
-
-                                    # Göster
-                                    col_mt1, col_mt2, col_mt3, col_mt4 = st.columns(4)
-                                    with col_mt1:
-                                        st.metric("⏱ MTTR", f"{mttr} dk",
-                                            help="Mean Time To Repair — Bu makine için ortalama tamir süresi")
-                                    with col_mt2:
-                                        st.metric("🔄 MTBF",
-                                            f"{mtbf_dk} dk" if mtbf_dk else "Yetersiz veri",
-                                            help="Mean Time Between Failures — Arızalar arası ortalama süre")
-                                    with col_mt3:
-                                        st.metric("📊 Toplam Arıza", f"{toplam_ariza} adet",
-                                            help="Bu makine için kapatılmış toplam arıza")
-                                    with col_mt4:
-                                        if avail_oran:
-                                            renk = "#4ade80" if avail_oran >= 85 else "#fbbf24" if avail_oran >= 70 else "#f87171"
-                                            st.markdown(f"""
-                                            <div style="background:rgba(30,41,59,0.8);border:1px solid rgba(99,179,237,0.18);
-                                                        border-radius:12px;padding:16px 20px;">
-                                              <div style="font-size:12px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">
-                                                📈 AVAILABILITY
-                                              </div>
-                                              <div style="font-size:28px;font-weight:700;color:{renk};margin-top:4px;">
-                                                %{avail_oran}
-                                              </div>
-                                            </div>""", unsafe_allow_html=True)
-                                        else:
-                                            st.metric("📈 Availability", "—")
-                    except Exception:
-                        pass
-
-                    st.markdown("---")
                     tum_tamam = True
                     if "Periyodik Bakım" in str(talep.get("Arıza Tanımı", "")):
                         st.markdown("#### ☑️ Bakım Kontrol Listesi")
                         try:
                             makine_adi = talep.get("Makine", "")
                             tum_bp     = sb_select("bakim_plani")
-                            bp_rows    = [r for r in tum_bp if r.get("makine","") == makine_adi]
+                            bp_rows    = [r for r in tum_bp if r.get("makine", "") == makine_adi]
                             bp_gecik   = [r for r in bp_rows if r.get("durum") == "Gecikmiş"]
                             if bp_gecik:
                                 bp_rows = bp_gecik
-
                             if bp_rows:
                                 bp_id    = bp_rows[0]["id"]
                                 maddeler = checklist_getir(bp_id)
-
                                 if maddeler:
                                     mevcut_kayitlar  = checklist_kayit_getir(talep["Talep No"])
-                                    # Sadece gerçek madde adlarıyla eşleşenleri say — mükerrer ve sahte kayıtları engelle
                                     madde_adlari     = {m["madde"] for m in maddeler}
-                                    tamamli_maddeler = {
-                                        k["madde"] for k in mevcut_kayitlar
-                                        if k.get("tamamlandi") and k["madde"] in madde_adlari
-                                    }
+                                    tamamli_maddeler = {k["madde"] for k in mevcut_kayitlar if k.get("tamamlandi") and k["madde"] in madde_adlari}
                                     tum_tamam        = len(tamamli_maddeler) >= len(maddeler)
                                     teknisyen_adi    = st.session_state.get("aktif_tam_ad", "")
-
-                                    # İlerleme göstergesi
                                     progress = min(len(tamamli_maddeler) / max(len(maddeler), 1), 1.0)
                                     renk = "#16A34A" if tum_tamam else "#D97706"
                                     st.markdown(f"""
-                                    <div style="background:rgba(30,41,59,0.6);border:1px solid rgba(99,179,237,0.2);
-                                                border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+                                    <div style="background:rgba(30,41,59,0.6);border:1px solid rgba(99,179,237,0.2);border-radius:10px;padding:14px 16px;margin-bottom:12px;">
                                       <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
                                         <span style="font-size:13px;font-weight:600;color:#e2e8f0;">☑️ Kontrol Listesi</span>
-                                        <span style="font-size:13px;font-weight:700;color:{renk};">
-                                          {len(tamamli_maddeler)}/{len(maddeler)} Tamamlandı
-                                        </span>
+                                        <span style="font-size:13px;font-weight:700;color:{renk};">{len(tamamli_maddeler)}/{len(maddeler)} Tamamlandı</span>
                                       </div>
                                       <div style="background:rgba(15,23,42,0.5);border-radius:6px;height:8px;">
                                         <div style="background:{renk};width:{int(progress*100)}%;height:8px;border-radius:6px;"></div>
                                       </div>
                                     </div>""", unsafe_allow_html=True)
 
-                                    # Form içinde checkboxlar — tek "Kaydet" butonuyla toplu kayıt
                                     with st.form(f"checklist_form_{talep['Talep No']}"):
-                                        st.markdown("**Tamamlanan maddeleri işaretleyin ve notlarınızı girin:**")
+                                        st.markdown("**Tamamlanan maddeleri işaretleyin:**")
                                         chk_degerleri = {}
                                         not_degerleri = {}
-
                                         for m in maddeler:
                                             zaten_tamam = m["madde"] in tamamli_maddeler
                                             mevcut_k    = next((k for k in mevcut_kayitlar if k["madde"] == m["madde"]), None)
                                             not_val     = mevcut_k.get("not_", "") if mevcut_k else ""
                                             yapan       = mevcut_k.get("yapan", "") if mevcut_k else ""
-
-                                            durum_ikon = "✅" if zaten_tamam else "⬜"
+                                            durum_ikon  = "✅" if zaten_tamam else "⬜"
                                             col_ck1, col_ck2, col_ck3 = st.columns([3, 3, 1])
-                                            m_id = m["id"]  # her zaman aynı tipi kullan
+                                            m_id = m["id"]
                                             with col_ck1:
-                                                chk_degerleri[m_id] = st.checkbox(
-                                                    f"{durum_ikon} **{m['sira']}.** {m['madde']}",
-                                                    value=zaten_tamam,
-                                                    key=f"chk_{talep['Talep No']}_{m_id}"
-                                                )
+                                                chk_degerleri[m_id] = st.checkbox(f"{durum_ikon} **{m['sira']}.** {m['madde']}", value=zaten_tamam, key=f"chk_{talep['Talep No']}_{m_id}")
                                             with col_ck2:
-                                                not_degerleri[m_id] = st.text_input(
-                                                    "Not",
-                                                    value=not_val,
-                                                    placeholder="Not ekle...",
-                                                    key=f"not_{talep['Talep No']}_{m_id}",
-                                                    label_visibility="collapsed"
-                                                )
+                                                not_degerleri[m_id] = st.text_input("Not", value=not_val, placeholder="Not ekle...", key=f"not_{talep['Talep No']}_{m_id}", label_visibility="collapsed")
                                             with col_ck3:
                                                 if zaten_tamam and yapan:
                                                     st.caption(f"👤 {yapan}")
 
-                                        kaydet_btn = st.form_submit_button(
-                                            "💾 Checklist Kaydet",
-                                            use_container_width=True
-                                        )
-
+                                        kaydet_btn = st.form_submit_button("💾 Checklist Kaydet", use_container_width=True)
                                         if kaydet_btn:
                                             zaman_str = datetime.now().strftime("%d/%m/%Y %H:%M")
                                             basari = True
                                             for m in maddeler:
-                                                m_id     = m["id"]
-                                                # int ve str key'lerin ikisini de dene
-                                                chk_val  = chk_degerleri.get(m_id,
-                                                           chk_degerleri.get(str(m_id),
-                                                           chk_degerleri.get(int(m_id) if isinstance(m_id, str) else m_id, False)))
-                                                not_val2 = not_degerleri.get(m_id,
-                                                           not_degerleri.get(str(m_id),
-                                                           not_degerleri.get(int(m_id) if isinstance(m_id, str) else m_id, "")))
+                                                m_id    = m["id"]
+                                                chk_val = chk_degerleri.get(m_id, chk_degerleri.get(str(m_id), False))
+                                                not_val2 = not_degerleri.get(m_id, not_degerleri.get(str(m_id), ""))
                                                 mevcut_k = next((k for k in mevcut_kayitlar if k["madde"] == m["madde"]), None)
                                                 if mevcut_k:
-                                                    ok = sb_update("bakim_checklist_kayit",
-                                                        f"id=eq.{mevcut_k['id']}", {
-                                                            "tamamlandi": chk_val,
-                                                            "yapan":  teknisyen_adi if chk_val else "",
-                                                            "zaman":  zaman_str if chk_val else "",
-                                                            "not_":   not_val2
-                                                        })
+                                                    ok = sb_update("bakim_checklist_kayit", f"id=eq.{mevcut_k['id']}", {"tamamlandi": chk_val, "yapan": teknisyen_adi if chk_val else "", "zaman": zaman_str if chk_val else "", "not_": not_val2})
                                                 else:
-                                                    ok = sb_insert("bakim_checklist_kayit", {
-                                                        "ariza_talep_no": talep["Talep No"],
-                                                        "bakim_plani_id": bp_id,
-                                                        "madde":      m["madde"],
-                                                        "tamamlandi": chk_val,
-                                                        "yapan":      teknisyen_adi if chk_val else "",
-                                                        "zaman":      zaman_str if chk_val else "",
-                                                        "not_":       not_val2
-                                                    })
+                                                    ok = sb_insert("bakim_checklist_kayit", {"ariza_talep_no": talep["Talep No"], "bakim_plani_id": bp_id, "madde": m["madde"], "tamamlandi": chk_val, "yapan": teknisyen_adi if chk_val else "", "zaman": zaman_str if chk_val else "", "not_": not_val2})
                                                 if not ok:
                                                     basari = False
                                             if basari:
                                                 st.success("✅ Checklist kaydedildi!")
                                             else:
-                                                st.error("❌ Bazı maddeler kaydedilemedi. Supabase bağlantısını kontrol edin.")
+                                                st.error("❌ Bazı maddeler kaydedilemedi.")
                                             time.sleep(0.8)
                                             st.rerun()
 
-                                    # Tamamlanma durumu
                                     if not tum_tamam:
                                         st.warning(f"⚠️ Tüm maddeler tamamlanmadan talep kapatılamaz! ({len(tamamli_maddeler)}/{len(maddeler)})")
                                     else:
-                                        st.success("✅ Tüm kontrol maddeleri tamamlandı! Aşağıdan talebi kapatabilirsiniz.")
-                                else:
-                                    st.info(f"ℹ️ Bu bakım planı (ID:{bp_id}) için henüz checklist maddesi eklenmemiş.")
-                                    st.caption("→ 'Bakım Planları' sekmesi → Checklist Yönetimi bölümünden madde ekleyin.")
-                            else:
-                                st.info(f"ℹ️ '{makine_adi}' makinesi için bakım planı bulunamadı.")
-                                st.caption("→ 'Bakım Planları' sekmesinden önce bakım planı oluşturun.")
+                                        st.success("✅ Tüm kontrol maddeleri tamamlandı!")
                         except Exception as e:
                             st.caption(f"Checklist yüklenemedi: {e}")
 
-                    # Saat seçiciler FORM DIŞINDA — anlık hesaplama için
                     st.markdown("##### 👤 Teknisyen & Zaman")
                     col_k1, col_k2, col_k3 = st.columns(3)
                     with col_k1:
-                        mudahale_eden_dis = st.text_input(
-                            "Müdahale Eden Teknisyen *",
-                            value=st.session_state.get("aktif_tam_ad",""),
-                            key="mud_eden_dis"
-                        )
+                        mudahale_eden_dis = st.text_input("Müdahale Eden Teknisyen *", value=st.session_state.get("aktif_tam_ad", ""), key="mud_eden_dis")
                     with col_k2:
-                        mud_bas_time = st.time_input(
-                            "🕐 Müdahaleye Başlama",
-                            value=datetime.now().time(),
-                            key="mud_bas_time",
-                            help="Teknisyenin müdahaleye başladığı saat"
-                        )
+                        mud_bas_time = st.time_input("🕐 Müdahaleye Başlama", value=datetime.now().time(), key="mud_bas_time")
                     with col_k3:
-                        mud_bit_time = st.time_input(
-                            "🕑 Arıza Giderilme",
-                            value=datetime.now().time(),
-                            key="mud_bit_time",
-                            help="Arızanın giderildiği saat"
-                        )
+                        mud_bit_time = st.time_input("🕑 Arıza Giderilme", value=datetime.now().time(), key="mud_bit_time")
 
-                    # Anlık hesapla
                     try:
-                        bugun = date.today()
-                        bd  = datetime.combine(bugun, mud_bas_time)
-                        btt = datetime.combine(bugun, mud_bit_time)
+                        bugun_d = date.today()
+                        bd  = datetime.combine(bugun_d, mud_bas_time)
+                        btt = datetime.combine(bugun_d, mud_bit_time)
                         if btt <= bd:
                             btt += timedelta(days=1)
                         cozum_dk = max(1, int((btt - bd).total_seconds() / 60))
@@ -1837,68 +1194,36 @@ with tab_kapat:
                         bekleme_dk = 0
                         toplam_dk  = cozum_dk
 
-                    isguc = round((cozum_dk / 60) * ISCI_UCRET, 2)
+                    isguc   = round((cozum_dk / 60) * ISCI_UCRET, 2)
                     mud_bas = mud_bas_time.strftime("%H:%M")
                     mud_bit = mud_bit_time.strftime("%H:%M")
 
-                    # Süre özet kartı
                     st.markdown(f"""
-                    <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
-                                border-radius:10px;padding:14px 16px;margin:8px 0 16px 0;">
+                    <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;margin:8px 0 16px 0;">
                       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center;">
-                        <div>
-                          <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">⚙️ Müdahale Süresi</div>
-                          <div style="font-size:22px;font-weight:800;color:#FFD700;">{cozum_dk} dk</div>
-                          <div style="font-size:10px;color:#9B6FBF;">{mud_bas} → {mud_bit}</div>
-                        </div>
-                        <div>
-                          <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">⏳ Bekleme Süresi</div>
-                          <div style="font-size:22px;font-weight:800;color:#C89EE8;">{bekleme_dk} dk</div>
-                          <div style="font-size:10px;color:#9B6FBF;">Açılış → Müdahale</div>
-                        </div>
-                        <div>
-                          <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">📊 Toplam Süre</div>
-                          <div style="font-size:22px;font-weight:800;color:#E8D5FF;">{toplam_dk} dk</div>
-                          <div style="font-size:10px;color:#9B6FBF;">Açılış → Kapanış</div>
-                        </div>
-                        <div>
-                          <div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">💰 İş Gücü</div>
-                          <div style="font-size:22px;font-weight:800;color:#4ade80;">{isguc:,.0f} ₺</div>
-                          <div style="font-size:10px;color:#9B6FBF;">300 ₺/saat</div>
-                        </div>
+                        <div><div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">⚙️ Müdahale Süresi</div><div style="font-size:22px;font-weight:800;color:#FFD700;">{cozum_dk} dk</div><div style="font-size:10px;color:#9B6FBF;">{mud_bas} → {mud_bit}</div></div>
+                        <div><div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">⏳ Bekleme Süresi</div><div style="font-size:22px;font-weight:800;color:#C89EE8;">{bekleme_dk} dk</div><div style="font-size:10px;color:#9B6FBF;">Açılış → Müdahale</div></div>
+                        <div><div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">📊 Toplam Süre</div><div style="font-size:22px;font-weight:800;color:#E8D5FF;">{toplam_dk} dk</div><div style="font-size:10px;color:#9B6FBF;">Açılış → Kapanış</div></div>
+                        <div><div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">💰 İş Gücü</div><div style="font-size:22px;font-weight:800;color:#4ade80;">{isguc:,.0f} ₺</div><div style="font-size:10px;color:#9B6FBF;">300 ₺/saat</div></div>
                       </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    </div>""", unsafe_allow_html=True)
 
                     with st.form("kapat_formu"):
-                        # Teknisyen form içinde de göster (gizli)
-                        mudahale_eden = st.text_input(
-                            "Müdahale Eden Teknisyen *",
-                            value=mudahale_eden_dis,
-                            key="mud_eden_form"
-                        )
-
-                        kok_neden    = st.selectbox("🔍 Kök Neden", [
-                            "Yağlama eksikliği","Aşınma (ömür tükenmesi)",
-                            "Hatalı kullanım","Yetersiz bakım periyodu",
-                            "Tasarım/malzeme yetersizliği","Dış etken (toz, nem, darbe)",
-                            "Yazılım/donanım arızası","Bilinmiyor","Diğer"])
-                        kapat_onayi = st.selectbox("✅ Kapatma Onayı", [
-                            "Teknisyen Onayı","Vardiya Amiri Onayı","Bakım Müdürü Onayı"])
-
+                        mudahale_eden = st.text_input("Müdahale Eden Teknisyen *", value=mudahale_eden_dis, key="mud_eden_form")
+                        kok_neden     = st.selectbox("🔍 Kök Neden", ["Yağlama eksikliği", "Aşınma (ömür tükenmesi)", "Hatalı kullanım", "Yetersiz bakım periyodu", "Tasarım/malzeme yetersizliği", "Dış etken (toz, nem, darbe)", "Yazılım/donanım arızası", "Bilinmiyor", "Diğer"])
+                        kapat_onayi   = st.selectbox("✅ Kapatma Onayı", ["Teknisyen Onayı", "Vardiya Amiri Onayı", "Bakım Müdürü Onayı"])
                         cozum_aciklama = st.text_area("Uygulanan Çözüm & Teknik Notlar *", height=90)
                         neden_analizi  = st.text_area("5 Neden Analizi", height=90)
                         kaizen         = st.text_area("Kaizen / İyileştirme Önerisi", height=70)
 
                         st.markdown("#### 📦 Kullanılan Malzeme")
-                        df_stok_k = stok_df_getir()
-                        stok_sec = ["—  Malzeme Kullanılmadı"]
+                        df_stok_k  = stok_df_getir()
+                        stok_sec   = ["—  Malzeme Kullanılmadı"]
                         if not df_stok_k.empty and "Malzeme Adı" in df_stok_k.columns:
                             stok_sec += df_stok_k["Malzeme Adı"].tolist()
-
-                        malzeme_secim  = st.selectbox("📦 Stoktan Malzeme", stok_sec)
-                        malzeme_adet   = st.number_input("Kullanılan Miktar", min_value=0, step=1, value=0)
-                        malzeme_maliyet= st.number_input("Malzeme Maliyeti (TL)", min_value=0, step=50, value=0)
+                        malzeme_secim   = st.selectbox("📦 Stoktan Malzeme", stok_sec)
+                        malzeme_adet    = st.number_input("Kullanılan Miktar", min_value=0, step=1, value=0)
+                        malzeme_maliyet = st.number_input("Malzeme Maliyeti (TL)", min_value=0, step=50, value=0)
 
                         submit_kapat = st.form_submit_button("✅ Talebi Kapat & Kaydet", use_container_width=True)
 
@@ -1912,54 +1237,42 @@ with tab_kapat:
                             else:
                                 malzeme_metni = "—"
                                 if "—" not in malzeme_secim and malzeme_adet > 0 and not df_stok_k.empty:
-                                    stok_satir = df_stok_k[df_stok_k["Malzeme Adı"]==malzeme_secim]
+                                    stok_satir = df_stok_k[df_stok_k["Malzeme Adı"] == malzeme_secim]
                                     if not stok_satir.empty:
                                         stok_mik = int(stok_satir["Stok Miktarı"].values[0])
                                         if stok_mik < malzeme_adet:
                                             st.error(f"❌ Yetersiz stok! Mevcut: {stok_mik}")
                                             st.stop()
-                                        sb_update("stok", f"malzeme_adi=eq.{malzeme_secim}", {
-                                            "stok_miktari": stok_mik - malzeme_adet,
-                                            "son_guncelleme": datetime.now().strftime("%d/%m/%Y")
-                                        })
+                                        sb_update("stok", f"malzeme_adi=eq.{malzeme_secim}", {"stok_miktari": stok_mik - malzeme_adet, "son_guncelleme": datetime.now().strftime("%d/%m/%Y")})
                                     malzeme_metni = f"{malzeme_secim} x {malzeme_adet}"
 
-                                toplam_maliyet = isguc + malzeme_maliyet
+                                toplam_maliyet_k = isguc + malzeme_maliyet
                                 kapat_zaman = datetime.now().strftime("%d/%m/%Y %H:%M")
                                 sla_s = sla_hesapla(talep["Öncelik"], talep["Açılış Tarihi"], kapat_zaman)
 
                                 sb_update("ariza_kayitlari", f"talep_no=eq.{secilen_no}", {
-                                    "durum":"Kapalı","kapatma_tarihi":kapat_zaman,
-                                    "mudahale_eden":mudahale_eden.strip(),
-                                    "ilk_mudahale_saati":f"{mud_bas.strip()} - {mud_bit.strip()}",
-                                    "cozum_suresi_dk":int(cozum_dk),"sla_durumu":sla_s["durum"],
-                                    "cozum_aciklamasi":cozum_aciklama.strip(),"kok_neden":str(kok_neden),
-                                    "bes_neden_analizi":neden_analizi,"kaizen_onerisi":kaizen,
-                                    "kullanilan_malzemeler":malzeme_metni,
-                                    "malzeme_maliyeti":float(malzeme_maliyet),
-                                    "isguc_maliyeti":float(isguc),"toplam_maliyet":float(toplam_maliyet),
-                                    "kapatma_onayi":str(kapat_onayi),
+                                    "durum": "Kapalı", "kapatma_tarihi": kapat_zaman,
+                                    "mudahale_eden": mudahale_eden.strip(),
+                                    "ilk_mudahale_saati": f"{mud_bas} - {mud_bit}",
+                                    "cozum_suresi_dk": int(cozum_dk), "sla_durumu": sla_s["durum"],
+                                    "cozum_aciklamasi": cozum_aciklama.strip(), "kok_neden": str(kok_neden),
+                                    "bes_neden_analizi": neden_analizi, "kaizen_onerisi": kaizen,
+                                    "kullanilan_malzemeler": malzeme_metni,
+                                    "malzeme_maliyeti": float(malzeme_maliyet),
+                                    "isguc_maliyeti": float(isguc), "toplam_maliyet": float(toplam_maliyet_k),
+                                    "kapatma_onayi": str(kapat_onayi),
                                 })
                                 cache_temizle()
-                                log_yaz("TALEP KAPATILDI", f"{secilen_no} — {mudahale_eden} — {cozum_dk} dk — {toplam_maliyet:.0f} TL")
-
-                                # Kapatma bildirimi — sadece Kritik ve Yüksek arızalarda
-                                if "KRİTİK" in str(talep.get("Öncelik","")) or "YÜKSEK" in str(talep.get("Öncelik","")):
+                                log_yaz("TALEP KAPATILDI", f"{secilen_no} — {mudahale_eden} — {cozum_dk} dk — {toplam_maliyet_k:.0f} TL")
+                                if "KRİTİK" in str(talep.get("Öncelik", "")) or "YÜKSEK" in str(talep.get("Öncelik", "")):
                                     email_gonder(
-                                        f"✅ Talep Kapatıldı — {talep.get('Makine','')} ({talep.get('Bölge','')})",
-                                        f"""Talep No     : {secilen_no}
-Makine       : {talep.get("Makine","")}
-Bölge        : {talep.get("Bölge","")}
-Müdahale Eden: {mudahale_eden}
-Çözüm Süresi : {cozum_dk} dakika ({mud_bas} - {mud_bit})
-SLA Durumu   : {sla_s["durum"]}
-Toplam Maliyet: {toplam_maliyet:,.0f} TL
-Kök Neden    : {kok_neden}
-Çözüm        : {cozum_aciklama.strip()[:200]}"""
+                                        f"✅ Talep Kapatıldı — {talep.get('Makine', '')}",
+                                        f"Talep No: {secilen_no}\nMakine: {talep.get('Makine','')}\nSüre: {cozum_dk} dk\nSLA: {sla_s['durum']}\nMaliyet: {toplam_maliyet_k:,.0f} TL"
                                     )
-                                st.success(f"✅ Talep **{secilen_no}** kapatıldı! Süre: {cozum_dk} dk | Toplam: {toplam_maliyet:,.0f} TL | {sla_s['durum']}")
+                                st.success(f"✅ Talep **{secilen_no}** kapatıldı! Süre: {cozum_dk} dk | Toplam: {toplam_maliyet_k:,.0f} TL | {sla_s['durum']}")
                                 time.sleep(1.5)
                                 st.rerun()
+
 
 # =============================================================================
 # SEKME 4: RAPORLAMA
@@ -1973,14 +1286,14 @@ with tab_rapor:
         df_r = ariza_df_getir()
 
         with st.expander("🔍 Filtrele & Ara", expanded=True):
-            col_f1,col_f2,col_f3,col_f4,col_f5 = st.columns(5)
-            with col_f1: f_bolge   = st.selectbox("Bölge",      ["Tümü"]+BOLGELER)
-            with col_f2: f_durum   = st.selectbox("Durum",      ["Tümü","Açık","Kapalı"])
-            with col_f3: f_oncelik = st.selectbox("Öncelik",    ["Tümü"]+list(ARIZA_ONCELIKLERI.keys()))
-            with col_f4: f_makine  = st.selectbox("Makine",     ["Tümü"]+MAKINE_LISTESI)
-            with col_f5: f_tur     = st.selectbox("Arıza Türü", ["Tümü"]+list(ARIZA_TURLERI.keys()))
-            col_t1,col_t2,col_t3 = st.columns([2,2,2])
-            with col_t1: f_bas   = st.date_input("Başlangıç", date(2025,1,1))
+            col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns(5)
+            with col_f1: f_bolge   = st.selectbox("Bölge",      ["Tümü"] + BOLGELER)
+            with col_f2: f_durum   = st.selectbox("Durum",      ["Tümü", "Açık", "Kapalı"])
+            with col_f3: f_oncelik = st.selectbox("Öncelik",    ["Tümü"] + list(ARIZA_ONCELIKLERI.keys()))
+            with col_f4: f_makine  = st.selectbox("Makine",     ["Tümü"] + MAKINE_LISTESI)
+            with col_f5: f_tur     = st.selectbox("Arıza Türü", ["Tümü"] + list(ARIZA_TURLERI.keys()))
+            col_t1, col_t2, col_t3 = st.columns([2, 2, 2])
+            with col_t1: f_bas   = st.date_input("Başlangıç", date(2025, 1, 1))
             with col_t2: f_bit   = st.date_input("Bitiş", date.today())
             with col_t3: f_arama = st.text_input("🔍 Metin Ara", placeholder="Talep no, personel, makine...")
 
@@ -1995,34 +1308,36 @@ with tab_rapor:
             if f_tur     != "Tümü" and "Arıza Türü" in g.columns: g = g[g["Arıza Türü"] == f_tur]
             if f_arama.strip():
                 try:
-                    mask = g.apply(lambda r: r.astype(str).str.contains(f_arama,case=False,na=False).any(), axis=1)
+                    mask = g.apply(lambda r: r.astype(str).str.contains(f_arama, case=False, na=False).any(), axis=1)
                     g = g[mask]
-                except: pass
+                except:
+                    pass
             try:
                 if "Açılış Tarihi" in g.columns:
                     g["_t"] = pd.to_datetime(g["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
-                    g = g[(g["_t"]>=f_bas)&(g["_t"]<=f_bit)].drop(columns=["_t"])
-            except: pass
+                    g = g[(g["_t"] >= f_bas) & (g["_t"] <= f_bit)].drop(columns=["_t"])
+            except:
+                pass
 
-            col_oz1,col_oz2,col_oz3,col_oz4 = st.columns(4)
+            col_oz1, col_oz2, col_oz3, col_oz4 = st.columns(4)
             with col_oz1: st.metric("Kayıt Sayısı", len(g))
             with col_oz2:
-                try: os_ = round(pd.to_numeric(g["Çözüm Süresi (Dk)"],errors="coerce").dropna().mean())
+                try: os_ = round(pd.to_numeric(g["Çözüm Süresi (Dk)"], errors="coerce").dropna().mean())
                 except: os_ = "—"
-                st.metric("Ort. Çözüm Süresi", f"{os_} dk" if isinstance(os_,(int,float)) else "—")
+                st.metric("Ort. Çözüm Süresi", f"{os_} dk" if isinstance(os_, (int, float)) else "—")
             with col_oz3:
-                try: tm = pd.to_numeric(g["Toplam Maliyet (TL)"],errors="coerce").sum()
+                try: tm = pd.to_numeric(g["Toplam Maliyet (TL)"], errors="coerce").sum()
                 except: tm = 0
                 st.metric("Toplam Maliyet", f"{tm:,.0f} ₺")
             with col_oz4:
-                try: sa = len(g[g["SLA Durumu"].str.contains("Aşıldı",na=False)])
+                try: sa = len(g[g["SLA Durumu"].str.contains("Aşıldı", na=False)])
                 except: sa = 0
                 st.metric("SLA Aşımı", sa)
 
-            col_dl1,_ = st.columns([1,4])
+            col_dl1, _ = st.columns([1, 4])
             with col_dl1:
                 st.download_button("📥 CSV İndir",
-                    g.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig"),
+                    g.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
                     file_name=f"ariza_raporu_{datetime.now().strftime('%Y%m%d_%H%M')}.csv", mime="text/csv")
 
             if not g.empty:
@@ -2034,388 +1349,34 @@ with tab_rapor:
                 except:
                     st.dataframe(g, use_container_width=True, hide_index=True)
 
-            # ── Makine Bazlı MTTR / MTBF Özeti ───────────────────────
             st.markdown("---")
             st.markdown("#### 📐 Makine Bazlı MTTR & MTBF Özeti")
             try:
                 df_kapali = g[g["Durum"] == "Kapalı"].copy() if "Durum" in g.columns else pd.DataFrame()
                 if not df_kapali.empty and "Çözüm Süresi (Dk)" in df_kapali.columns:
                     df_kapali["sure"] = pd.to_numeric(df_kapali["Çözüm Süresi (Dk)"], errors="coerce")
-                    df_kapali = df_kapali.dropna(subset=["sure","Makine"])
-
+                    df_kapali = df_kapali.dropna(subset=["sure", "Makine"])
                     if not df_kapali.empty:
                         ozet_rows = []
                         for makine_adi, grp in df_kapali.groupby("Makine"):
                             mttr = round(grp["sure"].mean(), 1)
                             toplam = len(grp)
-                            mtbf_dk = None
-                            avail   = None
+                            mtbf_dk = avail = None
                             if "Kapatma Tarihi" in grp.columns and toplam >= 2:
                                 grp2 = grp.copy()
                                 grp2["kap"] = pd.to_datetime(grp2["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce")
                                 grp2 = grp2.dropna(subset=["kap"]).sort_values("kap")
                                 if len(grp2) >= 2:
-                                    fark    = grp2["kap"].diff().dropna()
+                                    fark = grp2["kap"].diff().dropna()
                                     mtbf_dk = round(fark.dt.total_seconds().mean() / 60, 1)
-                                    avail   = round(mtbf_dk / (mtbf_dk + mttr) * 100, 1)
-                            ozet_rows.append({
-                                "Makine":          makine_adi,
-                                "Arıza Sayısı":    toplam,
-                                "MTTR (dk)":       mttr,
-                                "MTBF (dk)":       mtbf_dk if mtbf_dk else "—",
-                                "Availability (%)": avail if avail else "—",
-                            })
-
+                                    avail = round(mtbf_dk / (mtbf_dk + mttr) * 100, 1)
+                            ozet_rows.append({"Makine": makine_adi, "Arıza Sayısı": toplam, "MTTR (dk)": mttr, "MTBF (dk)": mtbf_dk if mtbf_dk else "—", "Availability (%)": avail if avail else "—"})
                         df_ozet = pd.DataFrame(ozet_rows).sort_values("Arıza Sayısı", ascending=False)
                         st.dataframe(df_ozet, use_container_width=True, hide_index=True)
-
-                        # En sorunlu makine
                         en_kotu = df_ozet.iloc[0]
                         st.info(f"⚠️ En fazla arıza: **{en_kotu['Makine']}** — {en_kotu['Arıza Sayısı']} arıza | MTTR: {en_kotu['MTTR (dk)']} dk")
-                    else:
-                        st.caption("Kapatılmış arıza verisi bulunamadı.")
-                else:
-                    st.caption("MTTR/MTBF için kapatılmış arıza kaydı gerekli.")
             except Exception as e:
                 st.caption(f"MTTR/MTBF hesaplanamadı: {e}")
-
-            if len(g)>0 and "Talep No" in g.columns:
-                with st.expander("📄 Talep Detay"):
-                    sn = st.selectbox("Talep seçin", g["Talep No"].tolist())
-                    sr = g[g["Talep No"]==sn]
-                    if not sr.empty:
-                        s = sr.iloc[0]
-                        col_d1,col_d2 = st.columns(2)
-                        alanlar = [a for a in ARIZA_SUTUNLARI if a in s.index]
-                        yari = len(alanlar)//2
-                        with col_d1:
-                            for a in alanlar[:yari]:
-                                if str(s[a]) not in ["","nan","0","0.0"]: st.markdown(f"**{a}:** {s[a]}")
-                        with col_d2:
-                            for a in alanlar[yari:]:
-                                if str(s[a]) not in ["","nan","0","0.0"]: st.markdown(f"**{a}:** {s[a]}")
-
-                        # Talep detayında o makineye ait MTTR/MTBF
-                        st.markdown("---")
-                        st.markdown(f"##### 📐 {s.get('Makine','—')} — MTTR & MTBF")
-                        try:
-                            df_mak = df_r[
-                                (df_r["Makine"] == s.get("Makine","")) &
-                                (df_r["Durum"]  == "Kapalı")
-                            ].copy()
-                            if not df_mak.empty and "Çözüm Süresi (Dk)" in df_mak.columns:
-                                df_mak["sure"] = pd.to_numeric(df_mak["Çözüm Süresi (Dk)"], errors="coerce")
-                                df_mak = df_mak.dropna(subset=["sure"])
-                                mttr_d = round(df_mak["sure"].mean(), 1)
-                                toplam_d = len(df_mak)
-                                mtbf_d = avail_d = None
-                                if toplam_d >= 2 and "Kapatma Tarihi" in df_mak.columns:
-                                    df_mak["kap"] = pd.to_datetime(df_mak["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce")
-                                    df_mak = df_mak.dropna(subset=["kap"]).sort_values("kap")
-                                    fark = df_mak["kap"].diff().dropna()
-                                    if len(fark) > 0:
-                                        mtbf_d  = round(fark.dt.total_seconds().mean() / 60, 1)
-                                        avail_d = round(mtbf_d / (mtbf_d + mttr_d) * 100, 1)
-                                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-                                with col_m1: st.metric("⏱ MTTR",     f"{mttr_d} dk")
-                                with col_m2: st.metric("🔄 MTBF",     f"{mtbf_d} dk" if mtbf_d else "—")
-                                with col_m3: st.metric("📊 Arıza",    f"{toplam_d} adet")
-                                with col_m4: st.metric("📈 Avail.",   f"%{avail_d}" if avail_d else "—")
-                            else:
-                                st.caption("Bu makine için henüz yeterli kapatılmış arıza yok.")
-                        except Exception as e:
-                            st.caption(f"Hesaplanamadı: {e}")
-
-            # ── Teknisyen İş Yükü Dengesi ─────────────────────────────
-            st.markdown("---")
-            st.markdown("#### 👨‍🔧 Teknisyen İş Yükü & Performans Analizi")
-            try:
-                df_tek = df_r.copy() if not df_r.empty else pd.DataFrame()
-                if df_tek.empty or "Müdahale Eden" not in df_tek.columns:
-                    st.caption("Henüz kapatılmış arıza verisi yok.")
-                else:
-                    df_tek_k = df_tek[
-                        (df_tek["Durum"] == "Kapalı") &
-                        (df_tek["Müdahale Eden"].notna()) &
-                        (df_tek["Müdahale Eden"] != "") &
-                        (df_tek["Müdahale Eden"] != "None")
-                    ].copy()
-
-                    if df_tek_k.empty:
-                        st.caption("Kapatılmış arıza kaydı bulunamadı.")
-                    else:
-                        df_tek_k["sure"] = pd.to_numeric(df_tek_k["Çözüm Süresi (Dk)"], errors="coerce").fillna(0)
-
-                        teknisyen_ozet = []
-                        for tek, grp in df_tek_k.groupby("Müdahale Eden"):
-                            if not tek or tek in ["", "None", "nan"]:
-                                continue
-                            toplam      = len(grp)
-                            ort_sure    = round(grp["sure"].mean(), 1)
-                            min_sure    = round(grp["sure"].min(), 1)
-                            max_sure    = round(grp["sure"].max(), 1)
-                            toplam_sure = round(grp["sure"].sum(), 0)
-                            kritik_say  = len(grp[grp["Öncelik"].str.contains("KRİTİK", na=False)])
-                            sla_basari  = len(grp[grp["SLA Durumu"].str.contains("İçinde", na=False)])
-                            sla_oran    = round(sla_basari / max(toplam, 1) * 100, 1)
-
-                            teknisyen_ozet.append({
-                                "Teknisyen":         tek,
-                                "Toplam Arıza":      toplam,
-                                "Kritik Arıza":      kritik_say,
-                                "Ort. Süre (dk)":    ort_sure,
-                                "En Hızlı (dk)":     min_sure,
-                                "En Uzun (dk)":      max_sure,
-                                "Toplam Süre (dk)":  int(toplam_sure),
-                                "SLA Başarı (%)":    sla_oran,
-                                "Puan":              "🥇" if sla_oran >= 90 else "🥈" if sla_oran >= 70 else "🥉"
-                            })
-
-                        if teknisyen_ozet:
-                            df_tek_ozet = pd.DataFrame(teknisyen_ozet).sort_values(
-                                "Toplam Arıza", ascending=False
-                            )
-
-                            # KPI kartlar — en iyi teknisyen
-                            en_hizli = df_tek_ozet.loc[df_tek_ozet["Ort. Süre (dk)"].idxmin()]
-                            en_aktif = df_tek_ozet.iloc[0]
-                            en_basarili = df_tek_ozet.loc[df_tek_ozet["SLA Başarı (%)"].idxmax()]
-
-                            col_t1, col_t2, col_t3 = st.columns(3)
-                            with col_t1:
-                                st.markdown(f"""
-                                <div style="background:rgba(22,163,74,0.1);border:1px solid rgba(22,163,74,0.3);
-                                            border-radius:10px;padding:14px 16px;">
-                                  <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">🏃 EN HIZLI</div>
-                                  <div style="font-size:18px;font-weight:700;color:#4ade80;margin-top:4px;">{en_hizli["Teknisyen"]}</div>
-                                  <div style="font-size:12px;color:#94a3b8;">Ort. {en_hizli["Ort. Süre (dk)"]} dk</div>
-                                </div>""", unsafe_allow_html=True)
-                            with col_t2:
-                                st.markdown(f"""
-                                <div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);
-                                            border-radius:10px;padding:14px 16px;">
-                                  <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">💪 EN AKTİF</div>
-                                  <div style="font-size:18px;font-weight:700;color:#93c5fd;margin-top:4px;">{en_aktif["Teknisyen"]}</div>
-                                  <div style="font-size:12px;color:#94a3b8;">{en_aktif["Toplam Arıza"]} arıza</div>
-                                </div>""", unsafe_allow_html=True)
-                            with col_t3:
-                                st.markdown(f"""
-                                <div style="background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);
-                                            border-radius:10px;padding:14px 16px;">
-                                  <div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;">🎯 EN BAŞARILI</div>
-                                  <div style="font-size:18px;font-weight:700;color:#fbbf24;margin-top:4px;">{en_basarili["Teknisyen"]}</div>
-                                  <div style="font-size:12px;color:#94a3b8;">%{en_basarili["SLA Başarı (%)"]} SLA</div>
-                                </div>""", unsafe_allow_html=True)
-
-                            st.markdown("<br>", unsafe_allow_html=True)
-                            st.dataframe(df_tek_ozet, use_container_width=True, hide_index=True)
-
-                            # Bar grafik — arıza sayısı
-                            st.markdown("**Teknisyen Bazlı Arıza Dağılımı**")
-                            st.bar_chart(
-                                df_tek_ozet.set_index("Teknisyen")["Toplam Arıza"],
-                                height=220
-                            )
-
-                            # İş yükü dengesi uyarısı
-                            max_ariza = df_tek_ozet["Toplam Arıza"].max()
-                            min_ariza = df_tek_ozet["Toplam Arıza"].min()
-                            if max_ariza > 0 and (max_ariza / max(min_ariza, 1)) > 3:
-                                st.warning(f"⚠️ İş yükü dengesiz — **{en_aktif['Teknisyen']}** diğerlerinden 3x fazla arızaya bakıyor. Görev dağılımını gözden geçirin.")
-
-                            # İndir
-                            st.download_button(
-                                "📥 Teknisyen Raporu İndir",
-                                df_tek_ozet.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
-                                file_name=f"teknisyen_raporu_{datetime.now().strftime('%Y%m%d')}.csv",
-                                mime="text/csv"
-                            )
-            except Exception as e:
-                st.caption(f"Teknisyen analizi yüklenemedi: {e}")
-
-            # ── Vardiya Bazlı Analiz ───────────────────────────────────
-            st.markdown("---")
-            st.markdown("#### 🌙 Vardiya Bazlı Arıza Analizi")
-            try:
-                if not df_r.empty and "Vardiya" in df_r.columns:
-                    df_v = df_r.copy()
-                    vardiya_ozet = []
-                    for vardiya, grp in df_v.groupby("Vardiya"):
-                        kapat = grp[grp["Durum"]=="Kapalı"].copy()
-                        kapat["sure"] = pd.to_numeric(kapat.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
-                        kritik = len(grp[grp["Öncelik"].str.contains("KRİTİK", na=False)])
-                        sla_as = len(grp[grp["SLA Durumu"].str.contains("Aşıldı", na=False)])
-                        vardiya_ozet.append({
-                            "Vardiya":          vardiya,
-                            "Toplam Arıza":     len(grp),
-                            "Kritik Arıza":     kritik,
-                            "Kapatılan":        len(kapat),
-                            "Ort. Süre (dk)":   round(kapat["sure"].mean(), 1) if not kapat.empty else 0,
-                            "SLA Aşımı":        sla_as,
-                            "Risk":             "🔴 Yüksek" if kritik > len(grp)*0.3 else "🟡 Orta" if kritik > 0 else "🟢 Düşük"
-                        })
-
-                    if vardiya_ozet:
-                        df_vard = pd.DataFrame(vardiya_ozet).sort_values("Toplam Arıza", ascending=False)
-
-                        col_v1, col_v2 = st.columns([2,1])
-                        with col_v1:
-                            st.dataframe(df_vard, use_container_width=True, hide_index=True)
-                        with col_v2:
-                            en_yogun = df_vard.iloc[0]
-                            st.markdown(f"""
-                            <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
-                                        border-radius:10px;padding:14px;text-align:center;">
-                              <div style="font-size:11px;color:#9B6FBF;text-transform:uppercase;margin-bottom:6px;">En Yoğun Vardiya</div>
-                              <div style="font-size:16px;font-weight:700;color:#FFD700;">{en_yogun["Vardiya"][:20]}</div>
-                              <div style="font-size:24px;font-weight:800;color:#E91E8C;margin:4px 0;">{en_yogun["Toplam Arıza"]}</div>
-                              <div style="font-size:11px;color:#9B6FBF;">arıza kaydı</div>
-                            </div>""", unsafe_allow_html=True)
-
-                        st.bar_chart(df_vard.set_index("Vardiya")["Toplam Arıza"], height=200)
-                else:
-                    st.caption("Vardiya verisi bulunamadı.")
-            except Exception as e:
-                st.caption(f"Vardiya analizi yüklenemedi: {e}")
-
-            # ── Maliyet Analizi ────────────────────────────────────────
-            st.markdown("---")
-            st.markdown("#### 💰 Maliyet Analizi & Bütçe Takibi")
-            try:
-                if not df_r.empty and "Toplam Maliyet (TL)" in df_r.columns:
-                    df_m = df_r[df_r["Durum"]=="Kapalı"].copy()
-                    df_m["maliyet"] = pd.to_numeric(df_m["Toplam Maliyet (TL)"], errors="coerce").fillna(0)
-                    df_m["isguc"]   = pd.to_numeric(df_m.get("İş Gücü Maliyeti (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0)
-                    df_m["malzeme"] = pd.to_numeric(df_m.get("Malzeme Maliyeti (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0)
-
-                    toplam_m = df_m["maliyet"].sum()
-                    toplam_is = df_m["isguc"].sum()
-                    toplam_mal = df_m["malzeme"].sum()
-
-                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-                    with col_m1: st.metric("💰 Toplam Maliyet", f"{toplam_m:,.0f} ₺")
-                    with col_m2: st.metric("👨‍🔧 İş Gücü", f"{toplam_is:,.0f} ₺", delta=f"%{round(toplam_is/max(toplam_m,1)*100,0):.0f}")
-                    with col_m3: st.metric("🔧 Malzeme", f"{toplam_mal:,.0f} ₺", delta=f"%{round(toplam_mal/max(toplam_m,1)*100,0):.0f}")
-                    with col_m4:
-                        en_pahali_mak = df_m.groupby("Makine")["maliyet"].sum().idxmax() if not df_m.empty else "—"
-                        en_pahali_val = df_m.groupby("Makine")["maliyet"].sum().max() if not df_m.empty else 0
-                        st.metric("🔴 En Maliyetli", en_pahali_mak[:15], delta=f"{en_pahali_val:,.0f} ₺")
-
-                    # Makine bazlı maliyet
-                    col_mc1, col_mc2 = st.columns(2)
-                    with col_mc1:
-                        st.markdown("**Makine Bazlı Toplam Maliyet**")
-                        mak_mal = df_m.groupby("Makine")["maliyet"].sum().sort_values(ascending=False).head(8)
-                        st.bar_chart(mak_mal, height=220)
-                    with col_mc2:
-                        st.markdown("**Aylık Maliyet Trendi**")
-                        try:
-                            df_m["_ay"] = pd.to_datetime(df_m["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.to_period("M").astype(str)
-                            aylik = df_m.groupby("_ay")["maliyet"].sum().tail(6)
-                            st.bar_chart(aylik, height=220)
-                        except: st.caption("Trend hesaplanamadı.")
-                else:
-                    st.caption("Maliyet verisi bulunamadı.")
-            except Exception as e:
-                st.caption(f"Maliyet analizi yüklenemedi: {e}")
-
-            # ── ISO 55001 Uyumluluk ────────────────────────────────────
-            st.markdown("---")
-            st.markdown("#### 📋 ISO 55001 Varlık Yönetimi Uyumluluk Skoru")
-            st.caption("ISO 55001, varlık yönetimi uluslararası standardıdır. Sisteminizin bu standarda uygunluğunu otomatik değerlendirir.")
-            try:
-                if not df_r.empty:
-                    df_iso = df_r.copy()
-                    toplam_iso = max(len(df_iso), 1)
-                    kapat_iso  = df_iso[df_iso["Durum"]=="Kapalı"]
-
-                    # ISO 55001 kriterleri
-                    kriterler = []
-
-                    # 1. Arıza kayıt kalitesi
-                    dolu_alan = df_iso[["Bildiren","Makine","Arıza Türü","Arıza Tanımı"]].notna().all(axis=1).sum()
-                    k1 = round(dolu_alan / toplam_iso * 100, 1)
-                    kriterler.append({"Kriter": "📝 Arıza Kayıt Kalitesi", "Puan": k1, "Açıklama": "Zorunlu alanların doluluk oranı"})
-
-                    # 2. SLA uyumu
-                    sla_ic = len(df_iso[df_iso["SLA Durumu"].str.contains("İçinde", na=False)])
-                    k2 = round(sla_ic / toplam_iso * 100, 1)
-                    kriterler.append({"Kriter": "⏱ SLA Uyum Oranı", "Puan": k2, "Açıklama": "Müdahale süresi hedeflerine uyum"})
-
-                    # 3. Kök neden analizi
-                    kok_dolu = len(kapat_iso[kapat_iso["Kök Neden"].notna() & (kapat_iso["Kök Neden"] != "")]) if "Kök Neden" in kapat_iso.columns else 0
-                    k3 = round(kok_dolu / max(len(kapat_iso), 1) * 100, 1)
-                    kriterler.append({"Kriter": "🔍 Kök Neden Analizi", "Puan": k3, "Açıklama": "Kapatılan taleplerde kök neden oranı"})
-
-                    # 4. Periyodik bakım planı
-                    try:
-                        df_bp_iso = bakim_df_getir()
-                    except:
-                        df_bp_iso = pd.DataFrame()
-                    makine_sayisi = df_iso["Makine"].nunique() if "Makine" in df_iso.columns else 1
-                    plan_sayisi   = len(df_bp_iso) if not df_bp_iso.empty else 0
-                    k4 = min(round(plan_sayisi / max(makine_sayisi, 1) * 100, 1), 100)
-                    kriterler.append({"Kriter": "🔧 Bakım Planı Kapsamı", "Puan": k4, "Açıklama": "Makine başına bakım planı oranı"})
-
-                    # 5. Çözüm belgeleme
-                    coz_dolu = len(kapat_iso[kapat_iso["Çözüm Açıklaması"].notna() & (kapat_iso["Çözüm Açıklaması"] != "")]) if "Çözüm Açıklaması" in kapat_iso.columns else 0
-                    k5 = round(coz_dolu / max(len(kapat_iso), 1) * 100, 1)
-                    kriterler.append({"Kriter": "📄 Çözüm Belgeleme", "Puan": k5, "Açıklama": "Kapatılan taleplerde çözüm dokümantasyonu"})
-
-                    # 6. Maliyet takibi
-                    mal_dolu = len(kapat_iso[pd.to_numeric(kapat_iso.get("Toplam Maliyet (TL)", pd.Series(dtype=float)), errors="coerce").fillna(0) > 0])
-                    k6 = round(mal_dolu / max(len(kapat_iso), 1) * 100, 1)
-                    kriterler.append({"Kriter": "💰 Maliyet Takibi", "Puan": k6, "Açıklama": "Maliyet girilen talep oranı"})
-
-                    genel_skor = round(sum(k["Puan"] for k in kriterler) / len(kriterler), 1)
-                    skor_renk  = "#4ade80" if genel_skor>=80 else "#FFD700" if genel_skor>=60 else "#E91E8C"
-                    skor_yazi  = "✅ İYİ — ISO 55001 Uyumlu" if genel_skor>=80 else "⚠️ GELİŞTİRİLEBİLİR" if genel_skor>=60 else "🔴 YETERSİZ"
-
-                    col_iso1, col_iso2 = st.columns([1, 2])
-                    with col_iso1:
-                        st.markdown(f"""
-                        <div style="background:rgba(61,0,102,0.8);border:2px solid {skor_renk};
-                                    border-radius:12px;padding:24px;text-align:center;">
-                          <div style="font-size:11px;color:#9B6FBF;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">
-                            ISO 55001 Uyumluluk Skoru
-                          </div>
-                          <div style="font-size:52px;font-weight:900;color:{skor_renk};line-height:1;">
-                            {genel_skor}
-                          </div>
-                          <div style="font-size:20px;color:{skor_renk};margin:4px 0;">/100</div>
-                          <div style="font-size:13px;font-weight:700;color:{skor_renk};margin-top:8px;">
-                            {skor_yazi}
-                          </div>
-                          <div style="background:rgba(255,255,255,0.05);border-radius:6px;height:8px;margin-top:12px;overflow:hidden;">
-                            <div style="background:{skor_renk};width:{genel_skor}%;height:100%;border-radius:6px;"></div>
-                          </div>
-                        </div>""", unsafe_allow_html=True)
-
-                    with col_iso2:
-                        df_iso_tablo = pd.DataFrame(kriterler)
-                        df_iso_tablo["Durum"] = df_iso_tablo["Puan"].apply(
-                            lambda x: "✅ İyi" if x>=80 else "⚠️ Geliştirilmeli" if x>=60 else "🔴 Yetersiz"
-                        )
-                        st.dataframe(df_iso_tablo, use_container_width=True, hide_index=True)
-
-                    # İyileştirme önerileri
-                    eksik = [k for k in kriterler if k["Puan"] < 80]
-                    if eksik:
-                        st.markdown("**🎯 İyileştirme Önerileri:**")
-                        for k in sorted(eksik, key=lambda x: x["Puan"]):
-                            st.warning(f"**{k['Kriter']}** — %{k['Puan']} → {k['Açıklama']} oranını artırın")
-
-                    # İndir
-                    st.download_button(
-                        "📥 ISO 55001 Raporu İndir",
-                        data=df_iso_tablo.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
-                        file_name=f"iso55001_raporu_{datetime.now().strftime('%Y%m%d')}.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.caption("ISO analizi için yeterli veri yok.")
-            except Exception as e:
-                st.caption(f"ISO analizi yüklenemedi: {e}")
 
 # =============================================================================
 # SEKME 5: STOK YÖNETİMİ
@@ -2433,126 +1394,65 @@ with tab_stok:
         else:
             df_st["Stok Miktarı"]  = pd.to_numeric(df_st["Stok Miktarı"], errors="coerce").fillna(0)
             df_st["Kritik Seviye"] = pd.to_numeric(df_st["Kritik Seviye"], errors="coerce").fillna(0)
-            kritik_stok = df_st[df_st["Stok Miktarı"]<=df_st["Kritik Seviye"]]
-            for _,row in kritik_stok.iterrows():
+            kritik_stok = df_st[df_st["Stok Miktarı"] <= df_st["Kritik Seviye"]]
+            for _, row in kritik_stok.iterrows():
                 st.markdown(f'''<div class="kritik-banner">⚠️ <strong style="color:#fbbf24;">ACİL SİPARİŞ:</strong> <span style="color:#cbd5e1;">{row["Malzeme Adı"]}</span> — Mevcut: <strong style="color:#f87171;">{row["Stok Miktarı"]} {row.get("Birim","adet")}</strong> / Kritik: {row["Kritik Seviye"]}</div>''', unsafe_allow_html=True)
 
             if df_st["Maksimum Stok"].sum() > 0:
                 df_st2 = df_st.copy()
-                df_st2["Doluluk %"] = (pd.to_numeric(df_st2["Stok Miktarı"],errors="coerce").fillna(0) /
-                               pd.to_numeric(df_st2["Maksimum Stok"],errors="coerce").replace(0,1).fillna(1) * 100
-                              ).round(1).clip(upper=100)
+                df_st2["Doluluk %"] = (pd.to_numeric(df_st2["Stok Miktarı"], errors="coerce").fillna(0) / pd.to_numeric(df_st2["Maksimum Stok"], errors="coerce").replace(0, 1).fillna(1) * 100).round(1).clip(upper=100)
                 st.markdown("#### Stok Doluluk Oranları")
                 st.bar_chart(df_st2.set_index("Malzeme Adı")["Doluluk %"], height=240)
 
-            col_tbl,col_form = st.columns([3,2])
-
+            col_tbl, col_form = st.columns([3, 2])
             with col_tbl:
                 st.markdown("#### Güncel Envanter Tablosu")
                 gsc = [s for s in STOK_SUTUNLARI if s in df_st.columns]
                 st.dataframe(df_st[gsc], use_container_width=True, hide_index=True)
-                st.download_button("📥 Envanter İndir",
-                    df_st.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig"),
-                    file_name=f"stok_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
+                st.download_button("📥 Envanter İndir", df_st.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"), file_name=f"stok_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
 
             with col_form:
                 st.markdown("#### 🔧 Stok Güncelle")
                 with st.form("stok_guncelle"):
                     secilen_mal = st.selectbox("Malzeme", df_st["Malzeme Adı"].tolist())
-                    islem_tipi  = st.radio("İşlem", ["Stok Girişi (Ekleme)","Stok Çıkışı (Kullanım)","Mutlak Değer Gir"])
+                    islem_tipi  = st.radio("İşlem", ["Stok Girişi (Ekleme)", "Stok Çıkışı (Kullanım)", "Mutlak Değer Gir"])
                     miktar      = st.number_input("Miktar", min_value=0, step=1, value=0)
                     st.text_input("Not", placeholder="Opsiyonel")
                     if st.form_submit_button("💾 Kaydet", use_container_width=True):
                         ds2  = stok_df_getir()
-                        ms2  = ds2["Malzeme Adı"]==secilen_mal
-                        mev  = int(ds2.loc[ms2,"Stok Miktarı"].values[0])
-                        if "Ekleme" in islem_tipi: yeni_m = mev+miktar
+                        ms2  = ds2["Malzeme Adı"] == secilen_mal
+                        mev  = int(ds2.loc[ms2, "Stok Miktarı"].values[0])
+                        if "Ekleme" in islem_tipi: yeni_m = mev + miktar
                         elif "Çıkış" in islem_tipi:
-                            if mev<miktar: st.error(f"❌ Yetersiz stok! Mevcut:{mev}"); st.stop()
-                            yeni_m = mev-miktar
+                            if mev < miktar: st.error(f"❌ Yetersiz stok! Mevcut:{mev}"); st.stop()
+                            yeni_m = mev - miktar
                         else: yeni_m = miktar
-                        sb_update("stok",f"malzeme_adi=eq.{secilen_mal}",{"stok_miktari":int(yeni_m),"son_guncelleme":datetime.now().strftime("%d/%m/%Y")})
+                        sb_update("stok", f"malzeme_adi=eq.{secilen_mal}", {"stok_miktari": int(yeni_m), "son_guncelleme": datetime.now().strftime("%d/%m/%Y")})
                         cache_temizle()
-                        log_yaz("STOK GÜNCELLEME",f"{secilen_mal} {mev}→{yeni_m}")
-
-                        # Kritik seviyeye düştüyse email gönder
+                        log_yaz("STOK GÜNCELLEME", f"{secilen_mal} {mev}→{yeni_m}")
                         try:
                             ds_check = stok_df_getir()
-                            satir = ds_check[ds_check["Malzeme Adı"]==secilen_mal]
+                            satir = ds_check[ds_check["Malzeme Adı"] == secilen_mal]
                             if not satir.empty:
                                 krit_sev = int(satir["Kritik Seviye"].values[0])
                                 if yeni_m <= krit_sev:
-                                    email_gonder(
-                                        f"⚠️ Kritik Stok Uyarısı — {secilen_mal}",
-                                        f"""Malzeme    : {secilen_mal}
-Mevcut Stok: {yeni_m} {satir["Birim"].values[0] if "Birim" in satir.columns else "adet"}
-Kritik Sev.: {krit_sev}
-Tedarikçi  : {satir["Tedarikçi"].values[0] if "Tedarikçi" in satir.columns else "—"}
-
-⚠️ Stok kritik seviyenin altına düştü. Acil sipariş gerekli!"""
-                                    )
-                        except Exception:
+                                    email_gonder(f"⚠️ Kritik Stok — {secilen_mal}", f"Mevcut: {yeni_m} | Kritik: {krit_sev}")
+                        except:
                             pass
                         st.success(f"✅ {secilen_mal}: {mev} → **{yeni_m}**")
-                        time.sleep(1); st.rerun()
+                        time.sleep(1)
+                        st.rerun()
 
                 if yetkili_mi("Yönetici"):
                     st.markdown("---")
-
-                    # Excel/CSV toplu yükleme
-                    st.markdown("#### 📂 Excel/CSV Toplu Yükleme")
-                    sablon = pd.DataFrame(columns=["Malzeme Kodu","Malzeme Adı","Kategori","Birim","Stok Miktarı","Kritik Seviye","Maksimum Stok","Son Fiyat (TL)","Tedarikçi"])
-                    st.download_button("📥 Şablon İndir", sablon.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig"), file_name="stok_sablon.csv", mime="text/csv")
-
-                    yukle_dosya = st.file_uploader("Excel (.xlsx) veya CSV (.csv)", type=["xlsx","csv"], key="stok_yukle")
-                    if yukle_dosya:
-                        try:
-                            df_yukle = pd.read_excel(yukle_dosya,dtype=str) if yukle_dosya.name.endswith(".xlsx") else pd.read_csv(yukle_dosya,dtype=str)
-                            st.markdown(f"**{len(df_yukle)} satır okundu.** Önizleme:")
-                            st.dataframe(df_yukle.head(5), use_container_width=True, hide_index=True)
-                            mod = st.radio("Yükleme Modu", ["Yeni ekle (var olanı atla)","Güncelle (stok miktarını yaz)"], key="yukle_mod")
-                            if st.button("🚀 Yüklemeyi Başlat"):
-                                dm  = stok_df_getir()
-                                ek=gu=at=0
-                                for _,sr in df_yukle.iterrows():
-                                    kod = str(sr.get("Malzeme Kodu","")).strip()
-                                    ad  = str(sr.get("Malzeme Adı","")).strip()
-                                    if not ad: continue
-                                    mev_mi = not dm.empty and (dm["Malzeme Kodu"]==kod).any()
-                                    veri = {
-                                        "malzeme_kodu":kod,"malzeme_adi":ad,
-                                        "kategori":str(sr.get("Kategori","Diğer")).strip(),
-                                        "birim":str(sr.get("Birim","Adet")).strip(),
-                                        "stok_miktari":float(str(sr.get("Stok Miktarı",0)).replace(",",".")or 0),
-                                        "kritik_seviye":float(str(sr.get("Kritik Seviye",0)).replace(",",".")or 0),
-                                        "maksimum_stok":float(str(sr.get("Maksimum Stok",0)).replace(",",".")or 0),
-                                        "son_fiyat":float(str(sr.get("Son Fiyat (TL)",0)).replace(",",".")or 0),
-                                        "tedarikci":str(sr.get("Tedarikçi","")).strip(),
-                                        "son_guncelleme":datetime.now().strftime("%d/%m/%Y")
-                                    }
-                                    if mev_mi:
-                                        if "Güncelle" in mod:
-                                            sb_update("stok",f"malzeme_kodu=eq.{kod}",{"stok_miktari":veri["stok_miktari"],"son_guncelleme":veri["son_guncelleme"]})
-                                            gu+=1
-                                        else: at+=1
-                                    else:
-                                        sb_insert("stok",veri); ek+=1
-                                cache_temizle()
-                                log_yaz("TOPLU STOK",f"Ek:{ek} Gün:{gu} Atl:{at}")
-                                st.success(f"✅ {ek} eklendi, {gu} güncellendi, {at} atlandı.")
-                                time.sleep(1); st.rerun()
-                        except Exception as e:
-                            st.error(f"❌ Dosya okunamadı: {e}")
-
-                    st.markdown("---")
                     st.markdown("#### ➕ Yeni Malzeme Tanımla")
                     with st.form("yeni_malzeme"):
-                        col_nm1,col_nm2 = st.columns(2)
+                        col_nm1, col_nm2 = st.columns(2)
                         with col_nm1:
                             y_kod  = st.text_input("Malzeme Kodu", placeholder="M009")
                             y_ad   = st.text_input("Malzeme Adı")
-                            y_kat  = st.selectbox("Kategori", ["Hareketli Parça","Sensör","Elektrik","Mekanik","Sarf","Hidrolik","Elektronik","Diğer"])
-                            y_bir  = st.selectbox("Birim", ["Adet","Litre","Metre","Kg","Rulo","Kutu","Set","Takım"])
+                            y_kat  = st.selectbox("Kategori", ["Hareketli Parça", "Sensör", "Elektrik", "Mekanik", "Sarf", "Hidrolik", "Elektronik", "Diğer"])
+                            y_bir  = st.selectbox("Birim", ["Adet", "Litre", "Metre", "Kg", "Rulo", "Kutu", "Set", "Takım"])
                         with col_nm2:
                             y_stok  = st.number_input("Başlangıç Stok", min_value=0, step=1)
                             y_krit  = st.number_input("Kritik Seviye",  min_value=0, step=1)
@@ -2564,430 +1464,23 @@ Tedarikçi  : {satir["Tedarikçi"].values[0] if "Tedarikçi" in satir.columns el
                             if y_kod and not ds3.empty and y_kod in ds3["Malzeme Kodu"].values:
                                 st.error("❌ Bu kod zaten mevcut!")
                             else:
-                                sb_insert("stok",{"malzeme_kodu":y_kod,"malzeme_adi":y_ad.strip(),"kategori":y_kat,"birim":y_bir,"stok_miktari":int(y_stok),"kritik_seviye":int(y_krit),"maksimum_stok":int(y_maks),"son_fiyat":float(y_fiyat),"tedarikci":y_tedarik,"son_guncelleme":datetime.now().strftime("%d/%m/%Y")})
+                                sb_insert("stok", {"malzeme_kodu": y_kod, "malzeme_adi": y_ad.strip(), "kategori": y_kat, "birim": y_bir, "stok_miktari": int(y_stok), "kritik_seviye": int(y_krit), "maksimum_stok": int(y_maks), "son_fiyat": float(y_fiyat), "tedarikci": y_tedarik, "son_guncelleme": datetime.now().strftime("%d/%m/%Y")})
                                 cache_temizle()
-                                log_yaz("YENİ MALZEME",f"{y_kod} — {y_ad}")
+                                log_yaz("YENİ MALZEME", f"{y_kod} — {y_ad}")
                                 st.success(f"✅ {y_ad} eklendi!")
-                                time.sleep(1); st.rerun()
-
-# =============================================================================
-# SEKME 6: SİSTEM AYARLARI
-# =============================================================================
-
-with tab_ayar:
-    if not giris_gerektir("Yönetici"):
-        pass
-    else:
-        st.markdown("### ⚙️ Sistem Ayarları & Kullanıcı Yönetimi")
-        col_a1,col_a2 = st.columns(2)
-
-        with col_a1:
-            st.markdown("#### 👥 Kullanıcı Listesi")
-            kullanicilar = kullanicilari_yukle()
-            for k_ad,k_bilgi in kullanicilar.items():
-                st.markdown(f'''<div class="durum-karti" style="padding:12px 16px;margin-bottom:8px;">
-                  <span style="font-weight:600;color:#e2e8f0;">{k_bilgi["tam_ad"]}</span>
-                  <span style="font-size:12px;color:#64748b;margin-left:8px;">@{k_ad}</span>
-                  <span class="sla-badge sla-ok" style="margin-left:8px;">{k_bilgi["rol"]}</span>
-                </div>''', unsafe_allow_html=True)
-
-            st.markdown("---")
-            st.markdown("#### ✏️ Kullanıcı Düzenle")
-            with st.form("kullanici_duzenle"):
-                duz_sec = st.selectbox("Düzenlenecek", list(kullanicilar.keys()), format_func=lambda k: f"{kullanicilar[k]['tam_ad']} (@{k})")
-                col_d1,col_d2 = st.columns(2)
-                with col_d1:
-                    duz_ad  = st.text_input("Ad Soyad", value=kullanicilar[duz_sec]["tam_ad"])
-                    duz_rol = st.selectbox("Rol", ["Operatör","Teknisyen","Yönetici"], index=["Operatör","Teknisyen","Yönetici"].index(kullanicilar[duz_sec]["rol"]))
-                with col_d2:
-                    duz_s1 = st.text_input("Yeni Şifre", type="password", placeholder="••••••")
-                    duz_s2 = st.text_input("Şifre Tekrar", type="password", placeholder="••••••")
-                if st.form_submit_button("💾 Kaydet", use_container_width=True):
-                    if duz_s1 and duz_s1!=duz_s2:
-                        st.error("❌ Şifreler eşleşmiyor!")
-                    else:
-                        gv = {"tam_ad":duz_ad.strip()or kullanicilar[duz_sec]["tam_ad"],"rol":duz_rol}
-                        if duz_s1: gv["sifre_hash"] = sifre_hashle(duz_s1)
-                        sb_update("kullanicilar",f"kullanici_adi=eq.{duz_sec}",gv)
-                        cache_temizle()
-                        log_yaz("KULLANICI GÜNCELLENDİ",f"{duz_sec}→{duz_rol}")
-                        st.success(f"✅ {duz_sec} güncellendi!")
-                        st.rerun()
-
-            st.markdown("---")
-            st.markdown("#### 🗑️ Kullanıcı Sil")
-            with st.form("kullanici_sil"):
-                ak = st.session_state.get("aktif_kullanici","")
-                silinebilir = {k:v for k,v in kullanicilar.items() if k!=ak}
-                sil_sec = st.selectbox("Silinecek", list(silinebilir.keys()), format_func=lambda k: f"{silinebilir[k]['tam_ad']} (@{k})") if silinebilir else None
-                if st.form_submit_button("🗑️ Sil", use_container_width=True) and sil_sec:
-                    sb_delete("kullanicilar",f"kullanici_adi=eq.{sil_sec}")
-                    cache_temizle()
-                    log_yaz("KULLANICI SİLİNDİ",sil_sec)
-                    st.success(f"✅ {sil_sec} silindi.")
-                    st.rerun()
-
-            st.markdown("---")
-            st.markdown("#### ➕ Yeni Kullanıcı Ekle")
-            with st.form("yeni_kullanici"):
-                col_u1,col_u2 = st.columns(2)
-                with col_u1:
-                    y_kul  = st.text_input("Kullanıcı Adı")
-                    y_sif  = st.text_input("Şifre", type="password")
-                with col_u2:
-                    y_ad2  = st.text_input("Ad Soyad")
-                    y_rol2 = st.selectbox("Rol", ["Operatör","Teknisyen","Yönetici"])
-                if st.form_submit_button("Kullanıcı Oluştur", use_container_width=True):
-                    if not all([y_kul,y_sif,y_ad2]): st.error("Tüm alanlar zorunludur.")
-                    elif y_kul.lower() in kullanicilar: st.error("Bu kullanıcı adı zaten mevcut.")
-                    else:
-                        sb_insert("kullanicilar",{"kullanici_adi":y_kul.lower(),"sifre_hash":sifre_hashle(y_sif),"rol":y_rol2,"tam_ad":y_ad2})
-                        cache_temizle()
-                        log_yaz("KULLANICI OLUŞTURULDU",f"{y_kul} — {y_rol2}")
-                        st.success(f"✅ {y_ad2} ({y_rol2}) oluşturuldu!")
-                        st.rerun()
-
-        with col_a2:
-            # Makine Yönetimi
-            st.markdown("#### 🏭 Makine Listesi Yönetimi")
-            with st.expander("Makine Ekle / Sil", expanded=False):
-                mk_rows = sb_select("makine_listesi","aktif=eq.true")
-                if mk_rows:
-                    df_mk = pd.DataFrame(mk_rows)[["bolge","makine_adi"]]
-                    df_mk.columns = ["Bölge","Makine Adı"]
-                    st.dataframe(df_mk, use_container_width=True, hide_index=True)
-                else:
-                    st.caption("Henüz eklenmemiş — sabit liste kullanılıyor.")
-                with st.form("makine_ekle"):
-                    m_bolge = st.selectbox("Bölge", BOLGELER, key="mb")
-                    m_ad    = st.text_input("Makine Adı", placeholder="Örn: VNA-05 (Hat C)")
-                    if st.form_submit_button("➕ Ekle", use_container_width=True) and m_ad.strip():
-                        sb_insert("makine_listesi",{"bolge":m_bolge,"makine_adi":m_ad.strip(),"aktif":True})
-                        cache_temizle()
-                        log_yaz("MAKİNE EKLENDİ",f"{m_bolge} — {m_ad}")
-                        st.success(f"✅ {m_ad} eklendi!"); st.rerun()
-                if mk_rows:
-                    sil_dict = {f"{r['bolge']} — {r['makine_adi']}":r["id"] for r in mk_rows}
-                    col_ms1,col_ms2 = st.columns([3,1])
-                    with col_ms1: sil_mk = st.selectbox("Silinecek", list(sil_dict.keys()), key="mk_sil")
-                    with col_ms2:
-                        st.markdown("<br>",unsafe_allow_html=True)
-                        if st.button("🗑️",key="mk_sil_btn"):
-                            sb_delete("makine_listesi",f"id=eq.{sil_dict[sil_mk]}")
-                            cache_temizle()
-                            st.success("Silindi!"); st.rerun()
-
-            # Arıza Türü Yönetimi
-            st.markdown("#### ⚙️ Arıza Türü Yönetimi")
-            with st.expander("Arıza Türü Ekle / Sil", expanded=False):
-                at_rows = sb_select("ariza_turu_listesi","aktif=eq.true")
-                if at_rows:
-                    df_at = pd.DataFrame(at_rows)[["kategori","alt_tur"]]
-                    df_at.columns = ["Kategori","Alt Tür"]
-                    st.dataframe(df_at, use_container_width=True, hide_index=True)
-                else:
-                    st.caption("Henüz eklenmemiş — sabit liste kullanılıyor.")
-                mevcut_kat = list(ARIZA_TURLERI.keys())
-                if at_rows:
-                    mevcut_kat = sorted(set(mevcut_kat+list({r["kategori"] for r in at_rows})))
-                with st.form("ariza_turu_ekle"):
-                    at_kat_sec = st.selectbox("Kategori", ["— Yeni kategori gir —"]+mevcut_kat, key="atk")
-                    at_kat_yeni= st.text_input("Yeni Kategori (opsiyonel)", placeholder="Örn: 🔩 Bağlantı")
-                    at_alt     = st.text_input("Alt Tür", placeholder="Örn: Cıvata gevşemesi")
-                    if st.form_submit_button("➕ Ekle", use_container_width=True) and at_alt.strip():
-                        kat = at_kat_yeni.strip() if at_kat_sec=="— Yeni kategori gir —" else at_kat_sec
-                        if kat:
-                            sb_insert("ariza_turu_listesi",{"kategori":kat,"alt_tur":at_alt.strip(),"aktif":True})
-                            cache_temizle()
-                            log_yaz("ARIZA TÜRÜ EKLENDİ",f"{kat} — {at_alt}")
-                            st.success(f"✅ {kat} → {at_alt}"); st.rerun()
-                if at_rows:
-                    sil_at = {f"{r['kategori']} — {r['alt_tur']}":r["id"] for r in at_rows}
-                    col_as1,col_as2 = st.columns([3,1])
-                    with col_as1: sil_at_sec = st.selectbox("Silinecek", list(sil_at.keys()), key="at_sil")
-                    with col_as2:
-                        st.markdown("<br>",unsafe_allow_html=True)
-                        if st.button("🗑️",key="at_sil_btn"):
-                            sb_delete("ariza_turu_listesi",f"id=eq.{sil_at[sil_at_sec]}")
-                            cache_temizle()
-                            st.success("Silindi!"); st.rerun()
-
-            st.markdown("---")
-            st.markdown("#### 📜 Sistem Aktivite Logu")
-            try:
-                log_rows = sb_select("sistem_log")
-                if log_rows:
-                    df_log = pd.DataFrame(log_rows).rename(columns={"zaman":"Zaman","kullanici":"Kullanıcı","islem":"İşlem","detay":"Detay"})
-                    st.dataframe(df_log.sort_values("Zaman",ascending=False).head(50), use_container_width=True, hide_index=True)
-                    st.download_button("📥 Log İndir", df_log.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig"), file_name=f"log_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
-                else:
-                    st.info("Henüz log kaydı yok.")
-            except Exception as e:
-                st.info(f"Log yüklenemedi: {e}")
-
-            st.markdown("---")
-            st.markdown("#### 📱 QR Kod & Makine Kodu Yönetimi")
-            st.caption("Her makine için benzersiz kod atayın. Operatörler sidebar'daki kutuya kodu girerek hızlı arıza bildirimi yapabilir.")
-
-            try:
-                import qrcode, io
-
-                qr_rows_mevcut = sb_select("qr_kodlar", "aktif=eq.true")
-                col_qr_list, col_qr_form = st.columns([3, 2])
-
-                with col_qr_list:
-                    st.markdown("**Tanımlı Makine Kodları**")
-                    if qr_rows_mevcut:
-                        df_qr = pd.DataFrame(qr_rows_mevcut)[["kod","bolge","makine"]]
-                        df_qr.columns = ["Kod","Bölge","Makine"]
-                        st.dataframe(df_qr, use_container_width=True, hide_index=True)
-                    else:
-                        st.info("Henüz makine kodu tanımlanmamış.")
-
-                with col_qr_form:
-                    st.markdown("**Yeni Makine Kodu Ekle**")
-                    with st.form("qr_ekle_form"):
-                        qr_b = st.selectbox("Bölge", BOLGELER, key="qr_b")
-                        qr_m = st.selectbox("Makine",
-                            aktif_makine_listesi().get(qr_b, MAKINE_LISTESI_BOLGE[qr_b]),
-                            key="qr_m")
-                        otomatik_kod = "".join([k for k in qr_m.upper() if k.isalnum()])[:6]
-                        qr_kod_yeni  = st.text_input("Makine Kodu (max 6 hane)",
-                            value=otomatik_kod, placeholder="Örn: VNA2").strip().upper()
-                        if st.form_submit_button("💾 Kod Ekle", use_container_width=True) and qr_kod_yeni:
-                            mevcut_kod = sb_select("qr_kodlar", f"kod=eq.{qr_kod_yeni}")
-                            if mevcut_kod:
-                                st.error(f"❌ Bu kod zaten var!")
-                            else:
-                                sb_insert("qr_kodlar", {"kod": qr_kod_yeni, "bolge": qr_b, "makine": qr_m, "aktif": True})
-                                log_yaz("QR KOD EKLENDİ", f"{qr_kod_yeni} → {qr_m}")
-                                st.success(f"✅ {qr_kod_yeni} eklendi!")
-                                time.sleep(0.5)
+                                time.sleep(1)
                                 st.rerun()
 
-                if qr_rows_mevcut:
-                    st.markdown("---")
-                    st.markdown("**QR Kod ve Makine Etiketi**")
-                    col_qr1, col_qr2 = st.columns(2)
-                    with col_qr1:
-                        sec_kod = st.selectbox("Kod Seç",
-                            [f"{r['kod']} — {r['makine']}" for r in qr_rows_mevcut], key="qr_sec")
-                        sec_kod_val = sec_kod.split(" — ")[0]
-                        sec_row = next(r for r in qr_rows_mevcut if r["kod"] == sec_kod_val)
-
-                    with col_qr2:
-                        try:
-                            app_url = st.secrets.get("app_url", "https://teknikv2-78qrqxtnuqyue3bvmk69e2.streamlit.app")
-                        except:
-                            app_url = "https://teknikv2-78qrqxtnuqyue3bvmk69e2.streamlit.app"
-
-                        # QR içine parametresiz URL — Streamlit bloklayamaz
-                        qr_img = qrcode.QRCode(version=1,
-                            error_correction=qrcode.constants.ERROR_CORRECT_H,
-                            box_size=10, border=3)
-                        qr_img.add_data(app_url)
-                        qr_img.make(fit=True)
-                        img = qr_img.make_image(fill_color="#0f172a", back_color="white")
-                        buf = io.BytesIO()
-                        img.save(buf, format="PNG")
-                        buf.seek(0)
-                        st.image(buf, width=160, caption=f"Kod: {sec_row['kod']}")
-                        buf.seek(0)
-                        st.download_button(f"📥 QR İndir — {sec_row['kod']}",
-                            data=buf.read(),
-                            file_name=f"qr_{sec_row['kod']}.png",
-                            mime="image/png", use_container_width=True)
-
-                    # Yazdırılabilir etiket
-                    st.markdown(f"""
-                    <div style="background:white;border:3px solid #0f172a;border-radius:12px;
-                                padding:20px;text-align:center;max-width:280px;color:#0f172a;margin-top:12px;">
-                      <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;color:#64748b;">TeknikPro CMMS</div>
-                      <div style="font-size:15px;font-weight:700;margin:6px 0 2px;color:#1e293b;">{sec_row["makine"]}</div>
-                      <div style="font-size:11px;color:#64748b;margin-bottom:10px;">{sec_row["bolge"]}</div>
-                      <div style="background:#0f172a;color:white;border-radius:8px;padding:10px 20px;
-                                  font-size:32px;font-weight:900;letter-spacing:0.2em;">{sec_row["kod"]}</div>
-                      <div style="font-size:10px;color:#94a3b8;margin-top:8px;">
-                        1. QR kodu okutun veya siteye gidin<br>
-                        2. Sidebar'a bu kodu girin: <strong>{sec_row["kod"]}</strong>
-                      </div>
-                    </div>""", unsafe_allow_html=True)
-
-                    # Sil
-                    if yetkili_mi("Yönetici"):
-                        st.markdown("---")
-                        col_qs1, col_qs2 = st.columns([3,1])
-                        with col_qs1:
-                            sil_kod = st.selectbox("Silinecek",
-                                [f"{r['kod']} — {r['makine']}" for r in qr_rows_mevcut], key="qr_sil")
-                        with col_qs2:
-                            st.markdown("<br>", unsafe_allow_html=True)
-                            if st.button("🗑️ Sil", key="qr_sil_btn"):
-                                sb_update("qr_kodlar", f"kod=eq.{sil_kod.split(' — ')[0]}", {"aktif": False})
-                                st.success("Silindi!"); st.rerun()
-
-            except ImportError:
-                st.warning("⚠️ qrcode kütüphanesi yüklenmemiş.")
-
-            st.markdown("---")
-            st.markdown("#### 📊 Haftalık Rapor Ayarları")
-            st.caption("Her Pazartesi sabahı otomatik gönderilir. İstediğiniz zaman manuel de gönderebilirsiniz.")
-
-            # Son gönderim logu
-            try:
-                rapor_log = sb_select("haftalik_rapor_log")
-                if rapor_log:
-                    son = rapor_log[0]
-                    st.success(f"✅ Son rapor: **{son.get('gonderim_tarihi','')}** — Hafta: {son.get('hafta','')} — Durum: {son.get('durum','')}")
-                else:
-                    st.info("Henüz haftalık rapor gönderilmemiş.")
-            except:
-                pass
-
-            if st.button("📧 Anlık Durum Raporu Gönder", key="haftalik_test", use_container_width=True):
-                with st.spinner("Rapor hazırlanıyor..."):
-                    try:
-                        df_test = ariza_df_getir()
-                        acik_t  = len(df_test[df_test["Durum"]=="Açık"]) if not df_test.empty and "Durum" in df_test.columns else 0
-                        kritik_t= len(df_test[(df_test["Durum"]=="Açık") & (df_test["Öncelik"].str.startswith("🔴",na=False))]) if not df_test.empty else 0
-                        toplam_t= len(df_test) if not df_test.empty else 0
-
-                        kritik_listesi_t = df_test[(df_test["Durum"]=="Açık") & (df_test["Öncelik"].str.startswith("🔴",na=False))].head(5) if not df_test.empty else pd.DataFrame()
-                        kritik_txt_t = ""
-                        for _, r in kritik_listesi_t.iterrows():
-                            kritik_txt_t += f"  • [{r.get('Talep No','')}] {r.get('Makine','')} — {str(r.get('Arıza Tanımı',''))[:50]}\n"
-                        kritik_txt_t = kritik_txt_t or "  • Kritik açık talep yok ✅"
-
-                        en_sorunlu_t = df_test["Makine"].value_counts().head(3).to_dict() if not df_test.empty and "Makine" in df_test.columns else {}
-                        en_sorunlu_txt_t = "\n".join([f"  • {k}: {v} arıza" for k,v in en_sorunlu_t.items()]) or "  • Veri yok"
-
-                        icerik_test = f"""
-[TEST RAPORU] — {datetime.now().strftime('%d/%m/%Y %H:%M')}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 MEVCUT SİSTEM DURUMU
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Toplam Talep       : {toplam_t}
-Açık Talepler      : {acik_t}
-Kritik Açık Talep  : {kritik_t}
-
-Kritik Açık Talepler:
-{kritik_txt_t}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔴 EN SORUNLU MAKİNELER
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-{en_sorunlu_txt_t}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Sisteme erişim: https://teknikv2-78qrqxtnuqyue3bvmk69e2.streamlit.app
-
-TeknikPro CMMS v2.0 — Test Raporu
-"""
-                        ok = email_gonder("📊 [TEST] Haftalık Bakım Raporu — TeknikPro CMMS", icerik_test)
-                        if ok:
-                            sb_insert("haftalik_rapor_log", {
-                                "gonderim_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                                "hafta": date.today().strftime("%Y-W%W") + "-TEST",
-                                "durum": "Test Gönderildi"
-                            })
-                            st.success("✅ Test raporu email ile gönderildi!")
-                        else:
-                            st.error("❌ Email gönderilemedi. Email ayarlarını kontrol edin.")
-                    except Exception as e:
-                        st.error(f"❌ Hata: {e}")
-
-            st.markdown("---")
-            st.markdown("#### 📧 Email Bildirim Ayarları")
-            try:
-                gonderici = st.secrets["email"]["gonderici"]
-                alici     = st.secrets["email"]["alici"]
-                st.success(f"✅ Email yapılandırıldı: **{gonderici}** → **{alici}**")
-                st.caption("Bildirimler: 🔴 Kritik/Yüksek arıza açıldığında | ✅ Kapatıldığında | ⚠️ Kritik stok")
-                if st.button("📧 Test Emaili Gönder", use_container_width=False):
-                    ok = email_gonder(
-                        "🧪 Test Bildirimi — TeknikPro CMMS",
-                        f"""Bu bir test mesajıdır.
-
-Sistem     : TeknikPro CMMS v2.0
-Tesis      : Adana LM / Tuzla LM
-Tarih      : {datetime.now().strftime("%d/%m/%Y %H:%M")}
-
-✅ Email bildirimleri başarıyla yapılandırıldı!"""
-                    )
-                    if ok:
-                        st.success("✅ Test emaili gönderildi!")
-                    else:
-                        st.error("❌ Email gönderilemedi. Gmail şifrenizi kontrol edin.")
-            except KeyError:
-                st.warning("⚠️ Email henüz yapılandırılmamış.")
-                st.caption("""Secrets'a ekleyin:
-```toml
-[email]
-gonderici = "sizin@gmail.com"
-sifre = "uygulama-sifresi"
-alici = "alici@gmail.com"
-```""")
-
-            st.markdown("---")
-            st.markdown("#### 🗄️ Veri Yedekleme")
-            col_bk1,col_bk2 = st.columns(2)
-            with col_bk1:
-                df_y = ariza_df_getir()
-                if not df_y.empty:
-                    st.download_button("💾 Arıza DB", df_y.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig"), file_name=f"ariza_db_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv", use_container_width=True)
-            with col_bk2:
-                df_sy = stok_df_getir()
-                if not df_sy.empty:
-                    st.download_button("💾 Stok DB", df_sy.to_csv(index=False,encoding="utf-8-sig").encode("utf-8-sig"), file_name=f"stok_db_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv", use_container_width=True)
-
-        st.markdown("---")
-        with st.expander("🗑️ Tehlikeli İşlemler (Veri Temizleme)"):
-            st.warning("⚠️ Bu işlemler geri alınamaz!")
-            col_d1,col_d2 = st.columns(2)
-            with col_d1:
-                if st.button("🗑️ Kapalı Talepleri Temizle", use_container_width=True):
-                    sb_delete("ariza_kayitlari","durum=eq.Kapalı")
-                    cache_temizle()
-                    log_yaz("VERİ TEMİZLEME","Kapalı talepler silindi")
-                    st.success("Temizlendi."); st.rerun()
-            with col_d2:
-                if st.button("🗑️ Sistem Logunu Temizle", use_container_width=True):
-                    sb_delete("sistem_log","id=gt.0")
-                    st.success("Log temizlendi."); st.rerun()
 
 # =============================================================================
-# SEKME: BAKIM PLANLARI
+# BAKIMPLANLARI — Sabitler
 # =============================================================================
 
-PERIYOTLAR = {
-    "Günlük":   1,
-    "Haftalık": 7,
-    "Aylık":    30,
-    "3 Aylık":  90,
-    "6 Aylık":  180,
-    "Yıllık":   365,
-}
-
-BAKIM_TURLERI = [
-    "Yağlama & Gres",
-    "Fren Testi",
-    "Rulman Kontrolü",
-    "Elektrik Bağlantı Kontrolü",
-    "Sensör Kalibrasyonu",
-    "Filtre Değişimi",
-    "Mekanik Bağlantı Kontrolü",
-    "Hidrolik Yağ Kontrolü",
-    "Akü / Şarj Kontrolü",
-    "Genel Revizyon",
-    "Temizlik & İnspeksiyon",
-    "Diğer",
-]
+PERIYOTLAR = {"Günlük": 1, "Haftalık": 7, "Aylık": 30, "3 Aylık": 90, "6 Aylık": 180, "Yıllık": 365}
+BAKIM_TURLERI = ["Yağlama & Gres", "Fren Testi", "Rulman Kontrolü", "Elektrik Bağlantı Kontrolü", "Sensör Kalibrasyonu", "Filtre Değişimi", "Mekanik Bağlantı Kontrolü", "Hidrolik Yağ Kontrolü", "Akü / Şarj Kontrolü", "Genel Revizyon", "Temizlik & İnspeksiyon", "Diğer"]
 
 @st.cache_data(ttl=30)
-def bakim_df_getir() -> pd.DataFrame:
+def bakim_df_getir():
     try:
         rows = sb_select("bakim_plani")
         if not rows:
@@ -2998,20 +1491,9 @@ def bakim_df_getir() -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
-def bakim_durumu_guncelle():
-    """Sonraki bakım tarihi geçmişse durumu 'Gecikmiş' yap."""
-    try:
-        rows = sb_select("bakim_plani", "durum=eq.Bekliyor")
-        bugun = date.today()
-        for r in rows:
-            try:
-                snr = datetime.strptime(r["sonraki_bakim_tarihi"], "%d/%m/%Y").date()
-                if snr < bugun:
-                    sb_update("bakim_plani", f"id=eq.{r['id']}", {"durum": "Gecikmiş"})
-            except:
-                pass
-    except:
-        pass
+# =============================================================================
+# SEKME 6: BAKIM PLANLARI
+# =============================================================================
 
 with tab_bakim:
     if not giris_gerektir("Yönetici"):
@@ -3020,55 +1502,40 @@ with tab_bakim:
         st.markdown("### 🔧 Periyodik Bakım Planları")
         df_bakim = bakim_df_getir()
 
-        # ── Özet KPI ──────────────────────────────────────────────────
         col_b1, col_b2, col_b3, col_b4 = st.columns(4)
-        bugun_str = date.today().strftime("%d/%m/%Y")
-        hafta_son = (date.today() + timedelta(days=7)).strftime("%d/%m/%Y")
-
         if not df_bakim.empty and "durum" in df_bakim.columns:
-            toplam_plan  = len(df_bakim)
-            gecikmiş     = len(df_bakim[df_bakim["durum"] == "Gecikmiş"])
-            bu_hafta     = 0
+            toplam_plan = len(df_bakim)
+            gecikmiş    = len(df_bakim[df_bakim["durum"] == "Gecikmiş"])
+            bu_hafta    = 0
             try:
                 df_bakim["_snr"] = pd.to_datetime(df_bakim["sonraki_bakim_tarihi"], format="%d/%m/%Y", errors="coerce").dt.date
-                bu_hafta = len(df_bakim[
-                    (df_bakim["_snr"] >= date.today()) &
-                    (df_bakim["_snr"] <= date.today() + timedelta(days=7))
-                ])
+                bu_hafta = len(df_bakim[(df_bakim["_snr"] >= date.today()) & (df_bakim["_snr"] <= date.today() + timedelta(days=7))])
                 df_bakim = df_bakim.drop(columns=["_snr"])
-            except: pass
+            except:
+                pass
             tamamlanan = len(df_bakim[df_bakim["durum"] == "Tamamlandı"])
         else:
             toplam_plan = gecikmiş = bu_hafta = tamamlanan = 0
 
         with col_b1: st.metric("📋 Toplam Plan", toplam_plan)
-        with col_b2: st.metric("⚠️ Gecikmiş",    gecikmiş,  delta="acil" if gecikmiş > 0 else "Temiz")
+        with col_b2: st.metric("⚠️ Gecikmiş",    gecikmiş)
         with col_b3: st.metric("📅 Bu Hafta",     bu_hafta)
         with col_b4: st.metric("✅ Tamamlanan",   tamamlanan)
 
         if gecikmiş > 0:
             df_gec = df_bakim[df_bakim["durum"] == "Gecikmiş"]
             for _, row in df_gec.iterrows():
-                st.markdown(f"""
-                <div class="kritik-banner">
-                  ⚠️ <strong style="color:#fbbf24;">GECİKMİŞ BAKIM:</strong>
-                  <span style="color:#cbd5e1;"> {row.get("makine","")} — {row.get("bakim_turu","")}</span>
-                  <span style="color:#94a3b8;font-size:12px;"> | Son bakım: {row.get("son_bakim_tarihi","—")} | Sorumlu: {row.get("sorumlu","—")}</span>
-                </div>""", unsafe_allow_html=True)
+                st.markdown(f'<div class="kritik-banner">⚠️ <strong style="color:#fbbf24;">GECİKMİŞ BAKIM:</strong> <span style="color:#cbd5e1;"> {row.get("makine","")} — {row.get("bakim_turu","")}</span></div>', unsafe_allow_html=True)
 
         st.markdown("---")
-
-        # ── Bakım Listesi & Tamamla ────────────────────────────────────
         col_liste, col_form = st.columns([3, 2])
 
         with col_liste:
             st.markdown("#### 📋 Bakım Planı Listesi")
-
-            # Filtreler
             col_fl1, col_fl2, col_fl3 = st.columns(3)
-            with col_fl1: fl_bolge  = st.selectbox("Bölge",  ["Tümü"] + BOLGELER, key="bk_bolge")
-            with col_fl2: fl_durum  = st.selectbox("Durum",  ["Tümü", "Bekliyor", "Gecikmiş", "Tamamlandı"], key="bk_durum")
-            with col_fl3: fl_periyot= st.selectbox("Periyot",["Tümü"] + list(PERIYOTLAR.keys()), key="bk_periyot")
+            with col_fl1: fl_bolge   = st.selectbox("Bölge",  ["Tümü"] + BOLGELER, key="bk_bolge")
+            with col_fl2: fl_durum   = st.selectbox("Durum",  ["Tümü", "Bekliyor", "Gecikmiş", "Tamamlandı"], key="bk_durum")
+            with col_fl3: fl_periyot = st.selectbox("Periyot", ["Tümü"] + list(PERIYOTLAR.keys()), key="bk_periyot")
 
             if not df_bakim.empty and "makine" in df_bakim.columns:
                 gb = df_bakim.copy()
@@ -3081,165 +1548,88 @@ with tab_bakim:
                 if gb.empty:
                     st.info("Filtreye uyan bakım planı bulunamadı.")
                 else:
-                    # Gösterilecek kolonlar
-                    gos_kol = [c for c in ["bolge","makine","bakim_turu","sonraki_bakim_tarihi","son_bakim_tarihi","sorumlu","durum"] if c in gb.columns]
-                    gos_df  = gb[gos_kol].rename(columns={
-                        "bolge":"Bölge","makine":"Makine","bakim_turu":"Bakım Türü",
-                        "sonraki_bakim_tarihi":"Sonraki Bakım","son_bakim_tarihi":"Son Bakım",
-                        "sorumlu":"Sorumlu","durum":"Durum"
-                    })
+                    gos_kol = [c for c in ["bolge", "makine", "bakim_turu", "sonraki_bakim_tarihi", "son_bakim_tarihi", "sorumlu", "durum"] if c in gb.columns]
+                    gos_df  = gb[gos_kol].rename(columns={"bolge": "Bölge", "makine": "Makine", "bakim_turu": "Bakım Türü", "sonraki_bakim_tarihi": "Sonraki Bakım", "son_bakim_tarihi": "Son Bakım", "sorumlu": "Sorumlu", "durum": "Durum"})
                     st.dataframe(gos_df, use_container_width=True, hide_index=True)
 
-                    # Bakım tamamla
                     st.markdown("#### ✅ Bakım Tamamlandı İşaretle")
-                    bekleyen = df_bakim[df_bakim["durum"].isin(["Bekliyor","Gecikmiş"])]
+                    bekleyen = df_bakim[df_bakim["durum"].isin(["Bekliyor", "Gecikmiş"])]
                     if not bekleyen.empty:
-                        secenekler = bekleyen.apply(
-                            lambda r: f"[ID:{r['id']}] {r.get('bolge','')} | {r.get('makine','')} — {r.get('bakim_turu','')}",
-                            axis=1
-                        ).tolist()
+                        secenekler = bekleyen.apply(lambda r: f"[ID:{r['id']}] {r.get('bolge','')} | {r.get('makine','')} — {r.get('bakim_turu','')}", axis=1).tolist()
                         secilen_bakim = st.selectbox("Tamamlanan Bakım", secenekler, key="bakim_sec")
                         bakim_id      = int(secilen_bakim.split("ID:")[1].split("]")[0])
-                        bakim_notu    = st.text_input("Bakım Notu (opsiyonel)", placeholder="Yapılan işlem, değiştirilen parça vb.", key="bakim_not")
-                        col_tb1, col_tb2 = st.columns([1, 2])
-                        with col_tb1:
-                            if st.button("✅ Tamamlandı Olarak İşaretle", use_container_width=True, key="bakim_tamam"):
-                                # Periyot gün sayısını bul
-                                bakim_satir = df_bakim[df_bakim["id"] == bakim_id].iloc[0]
-                                periyot_gun = int(bakim_satir.get("periyot_gun", 30))
-                                bugun_fmt   = date.today().strftime("%d/%m/%Y")
-                                sonraki_fmt = (date.today() + timedelta(days=periyot_gun)).strftime("%d/%m/%Y")
-
-                                sb_update("bakim_plani", f"id=eq.{bakim_id}", {
-                                    "durum":                "Tamamlandı",
-                                    "son_bakim_tarihi":     bugun_fmt,
-                                    "sonraki_bakim_tarihi": sonraki_fmt,
-                                    "notlar":               bakim_notu,
-                                })
-                                # Bir sonraki periyot için yeni kayıt oluştur
-                                sb_insert("bakim_plani", {
-                                    "bolge":                bakim_satir.get("bolge",""),
-                                    "makine":               bakim_satir.get("makine",""),
-                                    "bakim_turu":           bakim_satir.get("bakim_turu",""),
-                                    "aciklama":             bakim_satir.get("aciklama",""),
-                                    "periyot_gun":          periyot_gun,
-                                    "son_bakim_tarihi":     bugun_fmt,
-                                    "sonraki_bakim_tarihi": sonraki_fmt,
-                                    "sorumlu":              bakim_satir.get("sorumlu",""),
-                                    "durum":                "Bekliyor",
-                                    "notlar":               "",
-                                })
-                                bakim_df_getir.clear()
-                                log_yaz("BAKIM TAMAMLANDI", f"ID:{bakim_id} — {bakim_satir.get('makine','')} — {bakim_satir.get('bakim_turu','')}")
-                                st.success(f"✅ Bakım tamamlandı! Sonraki bakım: **{sonraki_fmt}**")
-                                time.sleep(1)
-                                st.rerun()
+                        bakim_notu    = st.text_input("Bakım Notu (opsiyonel)", key="bakim_not")
+                        if st.button("✅ Tamamlandı Olarak İşaretle", use_container_width=True, key="bakim_tamam"):
+                            bakim_satir = df_bakim[df_bakim["id"] == bakim_id].iloc[0]
+                            periyot_gun = int(bakim_satir.get("periyot_gun", 30))
+                            bugun_fmt   = date.today().strftime("%d/%m/%Y")
+                            sonraki_fmt = (date.today() + timedelta(days=periyot_gun)).strftime("%d/%m/%Y")
+                            sb_update("bakim_plani", f"id=eq.{bakim_id}", {"durum": "Tamamlandı", "son_bakim_tarihi": bugun_fmt, "sonraki_bakim_tarihi": sonraki_fmt, "notlar": bakim_notu})
+                            sb_insert("bakim_plani", {"bolge": bakim_satir.get("bolge", ""), "makine": bakim_satir.get("makine", ""), "bakim_turu": bakim_satir.get("bakim_turu", ""), "aciklama": bakim_satir.get("aciklama", ""), "periyot_gun": periyot_gun, "son_bakim_tarihi": bugun_fmt, "sonraki_bakim_tarihi": sonraki_fmt, "sorumlu": bakim_satir.get("sorumlu", ""), "durum": "Bekliyor", "notlar": ""})
+                            bakim_df_getir.clear()
+                            log_yaz("BAKIM TAMAMLANDI", f"ID:{bakim_id} — {bakim_satir.get('makine','')}")
+                            st.success(f"✅ Bakım tamamlandı! Sonraki: **{sonraki_fmt}**")
+                            time.sleep(1)
+                            st.rerun()
                     else:
                         st.info("Bekleyen bakım bulunmuyor.")
 
-                    # İndir
-                    st.download_button(
-                        "📥 Bakım Planı İndir",
-                        gos_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
-                        file_name=f"bakim_plani_{datetime.now().strftime('%Y%m%d')}.csv",
-                        mime="text/csv"
-                    )
+                    st.download_button("📥 Bakım Planı İndir", gos_df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"), file_name=f"bakim_plani_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
             else:
-                st.info("📭 Henüz bakım planı eklenmemiş. Sağdaki formdan ekleyin.")
+                st.info("📭 Henüz bakım planı eklenmemiş.")
 
         with col_form:
             st.markdown("#### ➕ Yeni Bakım Planı Ekle")
             with st.form("bakim_ekle_formu"):
-                bp_bolge   = st.selectbox("Bölge *", BOLGELER, key="bp_bolge")
-                bp_makine  = st.selectbox("Makine *", aktif_makine_listesi().get(bp_bolge, MAKINE_LISTESI_BOLGE[bp_bolge]), key="bp_makine")
-                bp_tur     = st.selectbox("Bakım Türü *", BAKIM_TURLERI, key="bp_tur")
-                bp_periyot = st.selectbox("Periyot *", list(PERIYOTLAR.keys()), key="bp_periyot")
-                bp_aciklama= st.text_area("Açıklama / Kontrol Listesi",
-                    placeholder="Yapılacak işlemleri listeleyin...\n- Yağ seviyesi kontrol\n- Zincir yağlama\n- Bağlantı sıkılığı",
-                    height=100, key="bp_aciklama")
-                bp_sorumlu = st.text_input("Sorumlu Teknisyen", key="bp_sorumlu",
-                    value=st.session_state.get("aktif_tam_ad", ""))
-                bp_ilk_tar = st.date_input("İlk Bakım Tarihi", value=date.today(), key="bp_tarih")
-
+                bp_bolge    = st.selectbox("Bölge *", BOLGELER, key="bp_bolge")
+                bp_makine   = st.selectbox("Makine *", aktif_makine_listesi().get(bp_bolge, MAKINE_LISTESI_BOLGE[bp_bolge]), key="bp_makine")
+                bp_tur      = st.selectbox("Bakım Türü *", BAKIM_TURLERI, key="bp_tur")
+                bp_periyot  = st.selectbox("Periyot *", list(PERIYOTLAR.keys()), key="bp_periyot")
+                bp_aciklama = st.text_area("Açıklama", height=100, key="bp_aciklama")
+                bp_sorumlu  = st.text_input("Sorumlu Teknisyen", key="bp_sorumlu", value=st.session_state.get("aktif_tam_ad", ""))
+                bp_ilk_tar  = st.date_input("İlk Bakım Tarihi", value=date.today(), key="bp_tarih")
                 submit_bakim = st.form_submit_button("📅 Bakım Planı Oluştur", use_container_width=True)
-
                 if submit_bakim:
                     periyot_gun = PERIYOTLAR[bp_periyot]
                     son_tar     = bp_ilk_tar.strftime("%d/%m/%Y")
                     snr_tar     = (bp_ilk_tar + timedelta(days=periyot_gun)).strftime("%d/%m/%Y")
-
-                    ok = sb_insert("bakim_plani", {
-                        "bolge":                bp_bolge,
-                        "makine":               bp_makine,
-                        "bakim_turu":           bp_tur,
-                        "aciklama":             bp_aciklama,
-                        "periyot_gun":          periyot_gun,
-                        "son_bakim_tarihi":     son_tar,
-                        "sonraki_bakim_tarihi": snr_tar,
-                        "sorumlu":              bp_sorumlu,
-                        "durum":                "Bekliyor",
-                        "notlar":               "",
-                    })
+                    ok = sb_insert("bakim_plani", {"bolge": bp_bolge, "makine": bp_makine, "bakim_turu": bp_tur, "aciklama": bp_aciklama, "periyot_gun": periyot_gun, "son_bakim_tarihi": son_tar, "sonraki_bakim_tarihi": snr_tar, "sorumlu": bp_sorumlu, "durum": "Bekliyor", "notlar": ""})
                     if ok:
                         bakim_df_getir.clear()
-                        log_yaz("BAKIM PLANI EKLENDİ", f"{bp_bolge} — {bp_makine} — {bp_tur} — {bp_periyot}")
-                        st.success(f"✅ **{bp_makine}** için {bp_periyot.lower()} {bp_tur} planı oluşturuldu! Sonraki bakım: **{snr_tar}**")
+                        log_yaz("BAKIM PLANI EKLENDİ", f"{bp_bolge} — {bp_makine} — {bp_tur}")
+                        st.success(f"✅ Bakım planı oluşturuldu! Sonraki: **{snr_tar}**")
                         time.sleep(1)
                         st.rerun()
                     else:
-                        try:
-                            url = f"{sb_url()}/rest/v1/bakim_plani"
-                            r = requests.post(url, headers=sb_headers(), json={
-                                "bolge": bp_bolge, "makine": bp_makine,
-                                "bakim_turu": bp_tur, "periyot_gun": PERIYOTLAR[bp_periyot],
-                                "durum": "Bekliyor"
-                            }, timeout=10)
-                            st.error(f"❌ Supabase {r.status_code}: {r.text[:400]}")
-                        except Exception as e:
-                            st.error(f"❌ Hata: {e}")
+                        st.error("❌ Kayıt başarısız.")
 
-            # Bakım planı sil
             if yetkili_mi("Yönetici") and not df_bakim.empty and "makine" in df_bakim.columns:
                 st.markdown("---")
                 st.markdown("#### 🗑️ Bakım Planı Sil")
-                tum_planlar = df_bakim.apply(
-                    lambda r: f"[ID:{r['id']}] {r.get('bolge','')} | {r.get('makine','')} — {r.get('bakim_turu','')} ({r.get('durum','')})",
-                    axis=1
-                ).tolist()
+                tum_planlar = df_bakim.apply(lambda r: f"[ID:{r['id']}] {r.get('bolge','')} | {r.get('makine','')} — {r.get('bakim_turu','')}", axis=1).tolist()
                 sil_plan = st.selectbox("Silinecek Plan", tum_planlar, key="bakim_sil_sec")
                 sil_id   = int(sil_plan.split("ID:")[1].split("]")[0])
                 if st.button("🗑️ Planı Sil", key="bakim_sil_btn"):
                     sb_delete("bakim_plani", f"id=eq.{sil_id}")
-                    sb_delete("bakim_checklist", f"bakim_plani_id=eq.{sil_id}")
                     bakim_df_getir.clear()
                     log_yaz("BAKIM PLANI SİLİNDİ", f"ID:{sil_id}")
                     st.success("Silindi.")
                     st.rerun()
 
-        # ── Checklist Yönetimi ─────────────────────────────────────────
         st.markdown("---")
         st.markdown("### ☑️ Checklist Yönetimi")
-        st.caption("Her bakım planı için yapılacak işlerin listesini tanımlayın.")
-
         if not df_bakim.empty and "makine" in df_bakim.columns:
             col_ck1, col_ck2 = st.columns([3, 2])
-
             with col_ck1:
                 st.markdown("#### Mevcut Checklist Maddeleri")
-                # Plan seç
-                plan_sec_list = df_bakim.apply(
-                    lambda r: f"[ID:{r['id']}] {r.get('bolge','')} | {r.get('makine','')} — {r.get('bakim_turu','')}",
-                    axis=1
-                ).tolist()
+                plan_sec_list = df_bakim.apply(lambda r: f"[ID:{r['id']}] {r.get('bolge','')} | {r.get('makine','')} — {r.get('bakim_turu','')}", axis=1).tolist()
                 secilen_plan_str = st.selectbox("Bakım Planı Seçin", plan_sec_list, key="ck_plan_sec")
                 secilen_plan_id  = int(secilen_plan_str.split("ID:")[1].split("]")[0])
-
                 maddeler = checklist_getir(secilen_plan_id)
                 if maddeler:
                     for m in maddeler:
                         col_m1, col_m2 = st.columns([5, 1])
-                        with col_m1:
-                            st.markdown(f"**{m['sira']}.** {m['madde']}")
+                        with col_m1: st.markdown(f"**{m['sira']}.** {m['madde']}")
                         with col_m2:
                             if st.button("🗑️", key=f"madde_sil_{m['id']}"):
                                 sb_update("bakim_checklist", f"id=eq.{m['id']}", {"aktif": False})
@@ -3250,59 +1640,35 @@ with tab_bakim:
             with col_ck2:
                 st.markdown("#### ➕ Madde Ekle")
                 with st.form("checklist_ekle"):
-                    ck_madde = st.text_input("Kontrol Maddesi *",
-                        placeholder="Örn: Yağ seviyesi kontrol edildi")
-                    ck_sira  = st.number_input("Sıra No", min_value=1, step=1,
-                        value=len(checklist_getir(secilen_plan_id)) + 1)
-                    ck_ekle  = st.form_submit_button("➕ Madde Ekle", use_container_width=True)
-                    if ck_ekle and ck_madde.strip():
-                        sb_insert("bakim_checklist", {
-                            "bakim_plani_id": secilen_plan_id,
-                            "sira":   int(ck_sira),
-                            "madde":  ck_madde.strip(),
-                            "aktif":  True
-                        })
+                    ck_madde = st.text_input("Kontrol Maddesi *", placeholder="Örn: Yağ seviyesi kontrol edildi")
+                    ck_sira  = st.number_input("Sıra No", min_value=1, step=1, value=len(checklist_getir(secilen_plan_id)) + 1)
+                    if st.form_submit_button("➕ Madde Ekle", use_container_width=True) and ck_madde.strip():
+                        sb_insert("bakim_checklist", {"bakim_plani_id": secilen_plan_id, "sira": int(ck_sira), "madde": ck_madde.strip(), "aktif": True})
                         st.success(f"✅ '{ck_madde}' eklendi!")
                         time.sleep(0.5)
                         st.rerun()
-
-                # Toplu madde ekle
                 st.markdown("---")
                 st.markdown("**📋 Toplu Madde Ekle**")
-                st.caption("Her satıra bir madde yazın")
                 with st.form("checklist_toplu"):
-                    toplu_metin = st.text_area("Maddeler (her satır bir madde)",
-                        placeholder="Yağ seviyesi kontrol\nFren testi\nRulman sesi dinle\nBağlantı sıkılığı kontrol",
-                        height=150)
-                    toplu_ekle = st.form_submit_button("📋 Hepsini Ekle", use_container_width=True)
-                    if toplu_ekle and toplu_metin.strip():
+                    toplu_metin = st.text_area("Maddeler (her satır bir madde)", height=150)
+                    if st.form_submit_button("📋 Hepsini Ekle", use_container_width=True) and toplu_metin.strip():
                         satirlar = [s.strip() for s in toplu_metin.strip().splitlines() if s.strip()]
                         mevcut_sira = len(checklist_getir(secilen_plan_id))
                         for i, satir in enumerate(satirlar):
-                            sb_insert("bakim_checklist", {
-                                "bakim_plani_id": secilen_plan_id,
-                                "sira":   mevcut_sira + i + 1,
-                                "madde":  satir,
-                                "aktif":  True
-                            })
+                            sb_insert("bakim_checklist", {"bakim_plani_id": secilen_plan_id, "sira": mevcut_sira + i + 1, "madde": satir, "aktif": True})
                         st.success(f"✅ {len(satirlar)} madde eklendi!")
                         time.sleep(0.5)
                         st.rerun()
         else:
             st.info("Önce bakım planı oluşturun.")
 
-        # ── Pano'da bu hafta yapılacak bakımlar ───────────────────────
         st.markdown("---")
         st.markdown("#### 📅 Takvim Görünümü — Önümüzdeki 30 Gün")
         if not df_bakim.empty and "sonraki_bakim_tarihi" in df_bakim.columns:
             try:
                 df_takvim = df_bakim.copy()
                 df_takvim["_snr"] = pd.to_datetime(df_takvim["sonraki_bakim_tarihi"], format="%d/%m/%Y", errors="coerce").dt.date
-                df_takvim = df_takvim[
-                    (df_takvim["_snr"] >= date.today()) &
-                    (df_takvim["_snr"] <= date.today() + timedelta(days=30))
-                ].sort_values("_snr")
-
+                df_takvim = df_takvim[(df_takvim["_snr"] >= date.today()) & (df_takvim["_snr"] <= date.today() + timedelta(days=30))].sort_values("_snr")
                 if df_takvim.empty:
                     st.info("Önümüzdeki 30 günde planlanmış bakım bulunmuyor.")
                 else:
@@ -3325,15 +1691,14 @@ with tab_bakim:
                         </div>""", unsafe_allow_html=True)
             except Exception as e:
                 st.caption(f"Takvim yüklenemedi: {e}")
-        else:
-            st.info("Bakım planı bulunmuyor.")
+
 
 # =============================================================================
-# SEKME: OEE ANALİZİ
+# SEKME 7: OEE ANALİZİ
 # =============================================================================
 
 @st.cache_data(ttl=30)
-def oee_df_getir() -> pd.DataFrame:
+def oee_df_getir():
     try:
         rows = sb_select("oee_kayit")
         if not rows:
@@ -3344,68 +1709,37 @@ def oee_df_getir() -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
-def oee_hesapla(planlanan, duraklamalar, uretilen, hedef, hurda):
-    """OEE = Availability × Performance × Quality"""
-    try:
-        calisma = planlanan - duraklamalar
-        availability  = round(calisma / planlanan * 100, 1) if planlanan > 0 else 0
-        performance   = round(uretilen / hedef * 100, 1) if hedef > 0 else 0
-        quality       = round((uretilen - hurda) / uretilen * 100, 1) if uretilen > 0 else 0
-        oee           = round(availability * performance * quality / 10000, 1)
-        return {
-            "availability":  min(availability, 100),
-            "performance":   min(performance, 100),
-            "quality":       min(quality, 100),
-            "oee":           min(oee, 100),
-        }
-    except:
-        return {"availability": 0, "performance": 0, "quality": 0, "oee": 0}
-
 def oee_renk(deger):
-    if deger >= 85:   return "#16A34A"  # Yeşil — Dünya standardı
-    elif deger >= 65: return "#D97706"  # Sarı  — Geliştirilmeli
-    else:             return "#DC2626"  # Kırmızı — Kritik
+    if deger >= 85:   return "#16A34A"
+    elif deger >= 65: return "#D97706"
+    else:             return "#DC2626"
 
 with tab_oee:
     if not giris_gerektir("Yönetici"):
         pass
     else:
         st.markdown("### 📈 OEE — Ekipman Etkinlik Analizi")
-        st.caption("Mevcut arıza verilerinden otomatik hesaplanır. Dünya standardı: Availability ≥ %90 | OEE ≥ %85")
-
+        st.caption("Mevcut arıza verilerinden otomatik hesaplanır. Hedef: Availability ≥ %90 | OEE ≥ %85")
         df_ariza_oee = ariza_df_getir()
 
         if df_ariza_oee.empty or "Durum" not in df_ariza_oee.columns:
             st.info("📭 Henüz yeterli arıza verisi yok.")
         else:
-            # ── Filtreler ─────────────────────────────────────────────
             col_f1, col_f2, col_f3 = st.columns(3)
-            with col_f1:
-                oee_bolge = st.selectbox("Bölge", ["Tümü"]+BOLGELER, key="oee_bolge")
-            with col_f2:
-                oee_gun = st.selectbox("Dönem", [
-                    "Son 7 Gün", "Son 30 Gün", "Son 90 Gün", "Tüm Zamanlar"
-                ], key="oee_gun")
-            with col_f3:
-                vardiya_suresi = st.number_input(
-                    "Vardiya Süresi (dk)",
-                    min_value=60, max_value=1440, step=60, value=480,
-                    help="Günlük planlanan çalışma süresi (örn: 480 = 8 saat)"
-                )
+            with col_f1: oee_bolge = st.selectbox("Bölge", ["Tümü"] + BOLGELER, key="oee_bolge")
+            with col_f2: oee_gun   = st.selectbox("Dönem", ["Son 7 Gün", "Son 30 Gün", "Son 90 Gün", "Tüm Zamanlar"], key="oee_gun")
+            with col_f3: vardiya_suresi = st.number_input("Vardiya Süresi (dk)", min_value=60, max_value=1440, step=60, value=480)
 
-            # Dönem filtresi
             gun_map = {"Son 7 Gün": 7, "Son 30 Gün": 30, "Son 90 Gün": 90, "Tüm Zamanlar": 3650}
             bas_tarih_oee = date.today() - timedelta(days=gun_map[oee_gun])
-
             df_o = df_ariza_oee.copy()
             if oee_bolge != "Tümü" and "Bölge" in df_o.columns:
                 df_o = df_o[df_o["Bölge"] == oee_bolge]
-
-            # Tarih filtresi
             try:
                 df_o["_ac"] = pd.to_datetime(df_o["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
                 df_o = df_o[df_o["_ac"] >= bas_tarih_oee]
-            except: pass
+            except:
+                pass
 
             if df_o.empty:
                 st.info("Seçilen dönemde veri bulunamadı.")
@@ -3413,18 +1747,14 @@ with tab_oee:
                 df_kapali = df_o[df_o["Durum"] == "Kapalı"].copy()
                 df_kapali["sure"] = pd.to_numeric(df_kapali.get("Çözüm Süresi (Dk)", pd.Series()), errors="coerce").fillna(0)
 
-                # ── Makine bazlı hesapla ───────────────────────────────
                 ozet = []
                 for makine, grp in df_kapali.groupby("Makine"):
                     toplam_ariza   = len(grp)
-                    toplam_durakma = grp["sure"].sum()  # dk
+                    toplam_durakma = grp["sure"].sum()
                     gun_sayisi     = max((date.today() - bas_tarih_oee).days, 1)
                     toplam_plan    = gun_sayisi * vardiya_suresi
-
-                    availability = round(max(0, (toplam_plan - toplam_durakma) / toplam_plan * 100), 1)
+                    availability   = round(max(0, (toplam_plan - toplam_durakma) / toplam_plan * 100), 1)
                     mttr = round(grp["sure"].mean(), 1) if toplam_ariza > 0 else 0
-
-                    # MTBF
                     mtbf_dk = None
                     if toplam_ariza >= 2 and "Kapatma Tarihi" in grp.columns:
                         grp2 = grp.copy()
@@ -3433,109 +1763,40 @@ with tab_oee:
                         if len(grp2) >= 2:
                             fark = grp2["kap"].diff().dropna()
                             mtbf_dk = round(fark.dt.total_seconds().mean() / 60, 1)
-
-                    # Basit OEE = Availability (Performance=100%, Quality=100% varsayılan)
-                    oee_val = availability
-
-                    durum = "🟢 İyi" if availability>=90 else "🟡 Geliştirilmeli" if availability>=70 else "🔴 Kritik"
-
-                    ozet.append({
-                        "Makine":           makine,
-                        "Arıza Sayısı":     toplam_ariza,
-                        "Toplam Durakma (dk)": int(toplam_durakma),
-                        "MTTR (dk)":        mttr,
-                        "MTBF (dk)":        mtbf_dk if mtbf_dk else "—",
-                        "Availability (%)": min(availability, 100),
-                        "OEE* (%)":         min(oee_val, 100),
-                        "Durum":            durum,
-                    })
+                    durum = "🟢 İyi" if availability >= 90 else "🟡 Geliştirilmeli" if availability >= 70 else "🔴 Kritik"
+                    ozet.append({"Makine": makine, "Arıza Sayısı": toplam_ariza, "Toplam Durakma (dk)": int(toplam_durakma), "MTTR (dk)": mttr, "MTBF (dk)": mtbf_dk if mtbf_dk else "—", "Availability (%)": min(availability, 100), "OEE* (%)": min(availability, 100), "Durum": durum})
 
                 if not ozet:
                     st.info("Kapatılmış arıza verisi bulunamadı.")
                 else:
                     df_ozet = pd.DataFrame(ozet).sort_values("Availability (%)", ascending=False)
-
-                    # ── KPI Kartlar ───────────────────────────────────
                     col_k1, col_k2, col_k3, col_k4 = st.columns(4)
                     ort_avail = round(df_ozet["Availability (%)"].mean(), 1)
                     ort_mttr  = round(df_kapali["sure"].mean(), 1) if not df_kapali.empty else 0
-                    en_kotu   = df_ozet.iloc[-1]["Makine"]
-                    en_iyi    = df_ozet.iloc[0]["Makine"]
-
                     with col_k1:
                         renk_a = oee_renk(ort_avail)
-                        st.markdown(f"""
-                        <div style="background:rgba(30,41,59,0.8);border:1px solid {renk_a}44;
-                                    border-radius:12px;padding:16px 20px;">
-                          <div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;">
-                            ORT. AVAİLABİLİTY
-                          </div>
-                          <div style="font-size:32px;font-weight:800;color:{renk_a};margin-top:4px;">
-                            %{ort_avail}
-                          </div>
-                          <div style="font-size:11px;color:#64748b;margin-top:4px;">
-                            Hedef: ≥%90
-                          </div>
-                        </div>""", unsafe_allow_html=True)
-                    with col_k2:
-                        st.metric("⏱ Ort. MTTR",     f"{ort_mttr} dk")
-                    with col_k3:
-                        st.metric("🟢 En İyi",         en_iyi,
-                            delta=f"%{df_ozet.iloc[0]['Availability (%)']}")
-                    with col_k4:
-                        st.metric("🔴 Geliştirilmeli", en_kotu,
-                            delta=f"%{df_ozet.iloc[-1]['Availability (%)']}")
-
+                        st.markdown(f'<div style="background:rgba(30,41,59,0.8);border:1px solid {renk_a}44;border-radius:12px;padding:16px 20px;"><div style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;">ORT. AVAİLABİLİTY</div><div style="font-size:32px;font-weight:800;color:{renk_a};margin-top:4px;">%{ort_avail}</div><div style="font-size:11px;color:#64748b;">Hedef: ≥%90</div></div>', unsafe_allow_html=True)
+                    with col_k2: st.metric("⏱ Ort. MTTR", f"{ort_mttr} dk")
+                    with col_k3: st.metric("🟢 En İyi", df_ozet.iloc[0]["Makine"], delta=f"%{df_ozet.iloc[0]['Availability (%)']}")
+                    with col_k4: st.metric("🔴 Geliştirilmeli", df_ozet.iloc[-1]["Makine"], delta=f"%{df_ozet.iloc[-1]['Availability (%)']}")
                     st.markdown("---")
-
-                    # ── Tablo ─────────────────────────────────────────
                     st.markdown("#### 📋 Makine Bazlı Availability Tablosu")
                     st.caption("*OEE = Availability (Performance ve Quality için üretim verisi gerekir)")
                     st.dataframe(df_ozet, use_container_width=True, hide_index=True)
-
-                    # ── Bar Grafik ────────────────────────────────────
                     st.markdown("#### 📊 Availability Karşılaştırması")
-                    chart_df = df_ozet.set_index("Makine")["Availability (%)"]
-                    st.bar_chart(chart_df, height=260)
-
-                    # ── Zaman Serisi ──────────────────────────────────
-                    st.markdown("#### 📉 Haftalık Duraklamalar Trendi")
-                    try:
-                        df_trend = df_kapali.copy()
-                        df_trend["_hafta"] = pd.to_datetime(
-                            df_trend["Kapatma Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce"
-                        ).dt.to_period("W").astype(str)
-                        haftalik = df_trend.groupby(["_hafta","Makine"])["sure"].sum().unstack(fill_value=0)
-                        if not haftalik.empty:
-                            st.bar_chart(haftalik, height=260)
-                    except Exception as e:
-                        st.caption(f"Trend yüklenemedi: {e}")
-
-                    # ── İyileştirme Önerileri ─────────────────────────
+                    st.bar_chart(df_ozet.set_index("Makine")["Availability (%)"], height=260)
                     st.markdown("---")
                     st.markdown("#### 💡 Öneri & Aksiyon")
                     for _, row in df_ozet.iterrows():
                         av = row["Availability (%)"]
                         if av < 70:
-                            st.markdown(f"""
-                            <div class="kritik-banner">
-                              🚨 <strong style="color:#f87171;">{row['Makine']}</strong>
-                              <span style="color:#cbd5e1;"> — Availability %{av} → Acil bakım/revizyon planı yapın.</span>
-                              <span style="color:#94a3b8;font-size:12px;"> MTTR: {row['MTTR (dk)']} dk | {row['Arıza Sayısı']} arıza</span>
-                            </div>""", unsafe_allow_html=True)
+                            st.markdown(f'<div class="kritik-banner">🚨 <strong style="color:#f87171;">{row["Makine"]}</strong> — Availability %{av} → Acil bakım/revizyon planı yapın.</div>', unsafe_allow_html=True)
                         elif av < 90:
                             st.warning(f"⚠️ **{row['Makine']}** — Availability %{av} → Periyodik bakım sıklığını artırın.")
-
-                    # İndir
-                    st.download_button("📥 OEE Raporu İndir",
-                        df_ozet.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
-                        file_name=f"oee_raporu_{datetime.now().strftime('%Y%m%d')}.csv",
-                        mime="text/csv")
+                    st.download_button("📥 OEE Raporu İndir", df_ozet.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"), file_name=f"oee_raporu_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
 
 # =============================================================================
-# FOOTER
-# =============================================================================
-# SEKME: AI TAHMİN MOTORU
+# SEKME 8: AI TAHMİN
 # =============================================================================
 
 with tab_ai:
@@ -3543,26 +1804,18 @@ with tab_ai:
         pass
     else:
         st.markdown("### 🤖 AI Arıza Tahmin & Analiz Motoru")
-        st.caption("Geçmiş arıza verilerini Claude AI ile analiz eder — risk tahminleri, kök neden analizi ve aksiyon önerileri üretir.")
-
         df_ai = ariza_df_getir()
 
         if df_ai.empty or len(df_ai) < 5:
             st.warning("⚠️ AI analizi için en az 5 kapatılmış arıza kaydı gerekli.")
         else:
-            # API key kontrolü
             try:
-                # Farklı konumlardan okumayı dene
                 api_key = ""
-                try:
-                    api_key = st.secrets["anthropic_api_key"]
-                except:
-                    pass
+                try: api_key = st.secrets["anthropic_api_key"]
+                except: pass
                 if not api_key:
-                    try:
-                        api_key = st.secrets["email"]["anthropic_api_key"]
-                    except:
-                        pass
+                    try: api_key = st.secrets["email"]["anthropic_api_key"]
+                    except: pass
                 if not api_key or not api_key.startswith("sk-"):
                     raise KeyError("API key bulunamadı")
                 st.success("✅ Claude API bağlantısı hazır.")
@@ -3570,27 +1823,16 @@ with tab_ai:
                 st.error("❌ Anthropic API key bulunamadı. Streamlit Secrets'a `anthropic_api_key` ekleyin.")
                 st.stop()
 
-            # Analiz seçenekleri
             col_ai1, col_ai2 = st.columns([2, 1])
-
             with col_ai2:
                 st.markdown("#### ⚙️ Analiz Ayarları")
                 ai_bolge = st.selectbox("Bölge", ["Tümü"] + BOLGELER, key="ai_bolge")
                 ai_gun   = st.selectbox("Dönem", ["Son 30 Gün", "Son 90 Gün", "Tüm Zamanlar"], key="ai_gun")
-                ai_tip   = st.selectbox("Analiz Tipi", [
-                    "🔮 Makine Risk Analizi",
-                    "📊 Arıza Trend Analizi",
-                    "👨‍🔧 Teknisyen Performans Değerlendirmesi",
-                    "💡 Bakım Optimizasyon Önerileri",
-                    "🎯 Genel Sistem Sağlık Raporu"
-                ], key="ai_tip")
-
+                ai_tip   = st.selectbox("Analiz Tipi", ["🔮 Makine Risk Analizi", "📊 Arıza Trend Analizi", "👨‍🔧 Teknisyen Performans Değerlendirmesi", "💡 Bakım Optimizasyon Önerileri", "🎯 Genel Sistem Sağlık Raporu"], key="ai_tip")
                 analiz_btn = st.button("🚀 AI Analizi Başlat", use_container_width=True, key="ai_btn")
 
             with col_ai1:
                 st.markdown("#### 📋 Analiz Kapsamı")
-
-                # Veri filtrele
                 gun_map = {"Son 30 Gün": 30, "Son 90 Gün": 90, "Tüm Zamanlar": 3650}
                 df_fil = df_ai.copy()
                 if ai_bolge != "Tümü" and "Bölge" in df_fil.columns:
@@ -3598,146 +1840,72 @@ with tab_ai:
                 try:
                     df_fil["_t"] = pd.to_datetime(df_fil["Açılış Tarihi"], format="%d/%m/%Y %H:%M", errors="coerce").dt.date
                     df_fil = df_fil[df_fil["_t"] >= date.today() - timedelta(days=gun_map[ai_gun])]
-                except: pass
-
+                except:
+                    pass
                 df_kap_ai = df_fil[df_fil["Durum"] == "Kapalı"].copy()
                 df_kap_ai["sure"] = pd.to_numeric(df_kap_ai.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
-
                 col_s1, col_s2, col_s3 = st.columns(3)
                 with col_s1: st.metric("📋 Toplam Kayıt", len(df_fil))
                 with col_s2: st.metric("✅ Kapatılmış", len(df_kap_ai))
                 with col_s3: st.metric("🏭 Farklı Makine", df_fil["Makine"].nunique() if "Makine" in df_fil.columns else 0)
+                if "ai_sonuc" not in st.session_state: st.session_state["ai_sonuc"] = ""
+                if "ai_tip_sonuc" not in st.session_state: st.session_state["ai_tip_sonuc"] = ""
 
-                # Mevcut sonuç alanı
-                if "ai_sonuc" not in st.session_state:
-                    st.session_state["ai_sonuc"] = ""
-                if "ai_tip_sonuc" not in st.session_state:
-                    st.session_state["ai_tip_sonuc"] = ""
-
-            # Analiz butonu
             if analiz_btn:
                 if len(df_kap_ai) < 3:
                     st.warning("⚠️ Seçilen dönemde yeterli kapatılmış arıza yok.")
                 else:
-                    # Veri özetini hazırla
-                    mak_ozet = df_kap_ai.groupby("Makine").agg(
-                        ariza_sayi=("Makine","count"),
-                        ort_sure=("sure","mean"),
-                        toplam_sure=("sure","sum")
-                    ).round(1).reset_index()
-
+                    mak_ozet = df_kap_ai.groupby("Makine").agg(ariza_sayi=("Makine","count"), ort_sure=("sure","mean"), toplam_sure=("sure","sum")).round(1).reset_index()
                     tur_ozet = df_kap_ai["Arıza Türü"].value_counts().head(5).to_dict() if "Arıza Türü" in df_kap_ai.columns else {}
                     tek_ozet = df_kap_ai["Müdahale Eden"].value_counts().head(5).to_dict() if "Müdahale Eden" in df_kap_ai.columns else {}
                     sla_asan = len(df_kap_ai[df_kap_ai["SLA Durumu"].str.contains("Aşıldı", na=False)]) if "SLA Durumu" in df_kap_ai.columns else 0
-
-                    # Prompt hazırla
                     tip_prompt = {
-                        "🔮 Makine Risk Analizi": "Her makine için arıza risk seviyesini (Düşük/Orta/Yüksek/Kritik) belirle. En riskli 3 makineyi öncelikli öner. Her biri için somut önleyici bakım aksiyonu ver.",
-                        "📊 Arıza Trend Analizi": "Arıza trendlerini analiz et. Hangi arıza türleri artıyor? Mevsimsel pattern var mı? Gelecek 30 günde hangi sorunlar beklenmeli?",
-                        "👨‍🔧 Teknisyen Performans Değerlendirmesi": "Teknisyen verilerini analiz et. Kim en verimli? Kim desteklenebilir? İş yükü dengeli mi? Somut öneriler ver.",
-                        "💡 Bakım Optimizasyon Önerileri": "Mevcut bakım stratejisini değerlendir. Reaktif mi, önleyici mi? Hangi makinelere periyodik bakım eklenmeli? Maliyet optimizasyonu için ne yapılmalı?",
-                        "🎯 Genel Sistem Sağlık Raporu": "Tesisin genel bakım sağlığını değerlendir. Güçlü yanlar, zayıf yanlar, acil aksiyonlar ve uzun vadeli öneriler ver. Yönetici özeti formatında sun."
+                        "🔮 Makine Risk Analizi": "Her makine için arıza risk seviyesini (Düşük/Orta/Yüksek/Kritik) belirle. En riskli 3 makineyi öncelikli öner.",
+                        "📊 Arıza Trend Analizi": "Arıza trendlerini analiz et. Hangi arıza türleri artıyor? Gelecek 30 günde hangi sorunlar beklenmeli?",
+                        "👨‍🔧 Teknisyen Performans Değerlendirmesi": "Teknisyen verilerini analiz et. Kim en verimli? İş yükü dengeli mi?",
+                        "💡 Bakım Optimizasyon Önerileri": "Bakım stratejisini değerlendir. Hangi makinelere periyodik bakım eklenmeli?",
+                        "🎯 Genel Sistem Sağlık Raporu": "Tesisin genel bakım sağlığını değerlendir. Güçlü/zayıf yanlar ve öneriler."
                     }
+                    prompt = f"""Sen endüstriyel bakım yönetimi uzmanısın. Türkçe yanıt ver.
+Bölge: {ai_bolge} | Dönem: {ai_gun} | Kapatılmış Arıza: {len(df_kap_ai)} | SLA Aşımı: {sla_asan}
 
-                    prompt = f"""Sen endüstriyel bakım yönetimi (CMMS) konusunda uzman bir AI danışmansın. 
-Türkçe yanıt ver. Veriler Türkiye'deki bir lojistik/depo tesisine ait.
+Makine Özeti:\n{mak_ozet.to_string(index=False)}
 
-## Tesis Bilgisi
-- Bölge: {ai_bolge}
-- Analiz Dönemi: {ai_gun}
-- Toplam Kapatılmış Arıza: {len(df_kap_ai)}
-- SLA Aşımı: {sla_asan} arıza
+Arıza Türleri:\n{chr(10).join([f"- {k}: {v}" for k,v in tur_ozet.items()])}
 
-## Makine Bazlı Arıza Özeti
-{mak_ozet.to_string(index=False)}
+Görevin: {tip_prompt.get(ai_tip, "Genel analiz yap.")}
 
-## En Sık Arıza Türleri
-{chr(10).join([f"- {k}: {v} arıza" for k,v in tur_ozet.items()])}
-
-## Teknisyen Dağılımı
-{chr(10).join([f"- {k}: {v} arıza" for k,v in tek_ozet.items()])}
-
-## Görevin
-{tip_prompt.get(ai_tip, "Genel analiz yap.")}
-
-Yanıtını şu formatta ver:
-1. **Özet Değerlendirme** (2-3 cümle)
-2. **Kritik Bulgular** (madde madde, maksimum 5)
-3. **Acil Aksiyonlar** (öncelik sırasına göre, maksimum 3)
-4. **Uzun Vadeli Öneriler** (maksimum 3)
-5. **Risk Skoru** (0-100 arası, 100=en riskli)
-
-Somut, uygulanabilir ve veriye dayalı yanıt ver."""
-
+Format: 1)Özet 2)Kritik Bulgular 3)Acil Aksiyonlar 4)Uzun Vadeli Öneriler 5)Risk Skoru (0-100)"""
                     with st.spinner("🤖 Claude AI analiz yapıyor..."):
                         try:
-                            resp = requests.post(
-                                "https://api.anthropic.com/v1/messages",
-                                headers={
-                                    "x-api-key": api_key,
-                                    "anthropic-version": "2023-06-01",
-                                    "content-type": "application/json"
-                                },
-                                json={
-                                    "model": "claude-haiku-4-5-20251001",
-                                    "max_tokens": 1500,
-                                    "messages": [{"role": "user", "content": prompt}]
-                                },
-                                timeout=30
-                            )
+                            resp = requests.post("https://api.anthropic.com/v1/messages", headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}, json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500, "messages": [{"role": "user", "content": prompt}]}, timeout=30)
                             if resp.ok:
                                 sonuc = resp.json()["content"][0]["text"]
                                 st.session_state["ai_sonuc"] = sonuc
                                 st.session_state["ai_tip_sonuc"] = ai_tip
-                                log_yaz("AI ANALİZ", f"{ai_tip} — {ai_bolge} — {ai_gun}")
+                                log_yaz("AI ANALİZ", f"{ai_tip} — {ai_bolge}")
                             else:
-                                st.error(f"❌ API Hatası {resp.status_code}: {resp.text[:200]}")
+                                st.error(f"❌ API Hatası {resp.status_code}")
                         except Exception as e:
                             st.error(f"❌ Bağlantı hatası: {e}")
 
-            # Sonuç göster
             if st.session_state.get("ai_sonuc"):
                 st.markdown("---")
-                st.markdown(f"""
-                <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);
-                            border-left:4px solid #FFD700;border-radius:10px;padding:16px;margin-bottom:16px;">
-                  <div style="font-size:11px;color:#9B6FBF;font-weight:700;text-transform:uppercase;margin-bottom:8px;">
-                    🤖 Claude AI Analiz Sonucu — {st.session_state.get("ai_tip_sonuc","")}
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
-
+                st.markdown(f'<div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);border-left:4px solid #FFD700;border-radius:10px;padding:16px;margin-bottom:16px;"><div style="font-size:11px;color:#9B6FBF;font-weight:700;text-transform:uppercase;margin-bottom:8px;">🤖 Claude AI — {st.session_state.get("ai_tip_sonuc","")}</div></div>', unsafe_allow_html=True)
                 st.markdown(st.session_state["ai_sonuc"])
-
-                col_dl, col_yeni = st.columns([1,3])
+                col_dl, col_yeni = st.columns([1, 3])
                 with col_dl:
-                    st.download_button(
-                        "📥 Raporu İndir",
-                        data=st.session_state["ai_sonuc"].encode("utf-8"),
-                        file_name=f"ai_rapor_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                        mime="text/plain"
-                    )
+                    st.download_button("📥 Raporu İndir", data=st.session_state["ai_sonuc"].encode("utf-8"), file_name=f"ai_rapor_{datetime.now().strftime('%Y%m%d_%H%M')}.txt", mime="text/plain")
                 with col_yeni:
                     if st.button("🔄 Yeni Analiz", key="ai_temizle"):
                         st.session_state["ai_sonuc"] = ""
                         st.rerun()
-
             elif not analiz_btn:
-                st.markdown("""
-                <div style="text-align:center;padding:40px;background:rgba(61,0,102,0.4);
-                            border:1px solid rgba(255,215,0,0.1);border-radius:12px;">
-                  <div style="font-size:48px;margin-bottom:12px;">🤖</div>
-                  <div style="font-size:16px;font-weight:700;color:#FFD700;margin-bottom:8px;">
-                    AI Analizi Hazır
-                  </div>
-                  <div style="font-size:13px;color:#9B6FBF;">
-                    Sağdaki seçeneklerden analiz tipini seçin ve "AI Analizi Başlat" butonuna basın.
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown('<div style="text-align:center;padding:40px;background:rgba(61,0,102,0.4);border:1px solid rgba(255,215,0,0.1);border-radius:12px;"><div style="font-size:48px;margin-bottom:12px;">🤖</div><div style="font-size:16px;font-weight:700;color:#FFD700;margin-bottom:8px;">AI Analizi Hazır</div><div style="font-size:13px;color:#9B6FBF;">Sağdaki seçeneklerden analiz tipini seçin ve başlatın.</div></div>', unsafe_allow_html=True)
+
 
 # =============================================================================
-# SEKME: DİJİTAL İKİZ
+# SEKME 9: DİJİTAL İKİZ
 # =============================================================================
 
 with tab_twin:
@@ -3745,19 +1913,14 @@ with tab_twin:
         pass
     else:
         st.markdown("### 🏭 Dijital İkiz — Tesis Makine Durumu")
-
         df_twin = ariza_df_getir()
-
-        # Bölge seçimi
         twin_bolge = st.radio("Tesis", ["🏭 Adana LM", "🏭 Tuzla LM"], horizontal=True, key="twin_bolge")
         bolge_kisa = "Adana" if "Adana" in twin_bolge else "Tuzla"
 
-        # Bölge filtreli arıza verisi
         bolge_df = pd.DataFrame()
         if not df_twin.empty and "Bölge" in df_twin.columns:
             bolge_df = df_twin[df_twin["Bölge"].str.contains(bolge_kisa, na=False)]
 
-        # Gerçek makine listesi
         mak_listesi_db = aktif_makine_listesi()
         gercek_makineler = []
         for k, v in mak_listesi_db.items():
@@ -3768,17 +1931,13 @@ with tab_twin:
             gercek_makineler = sorted([m for m in bolge_df["Makine"].unique() if m and m != "Diğer"])
 
         def makine_durum(mak, df):
-            if df.empty or "Makine" not in df.columns:
-                return "bilgi-yok", "", 0
+            if df.empty or "Makine" not in df.columns: return "bilgi-yok", "", 0
             mdf = df[df["Makine"] == mak]
-            if mdf.empty:
-                return "bilgi-yok", "", 0
+            if mdf.empty: return "bilgi-yok", "", 0
             kritik = mdf[(mdf["Durum"]=="Açık") & (mdf["Öncelik"].str.startswith("🔴",na=False))]
-            if not kritik.empty:
-                return "kritik", str(kritik.iloc[0].get("Arıza Tanımı",""))[:40], len(kritik)
+            if not kritik.empty: return "kritik", str(kritik.iloc[0].get("Arıza Tanımı",""))[:40], len(kritik)
             acik = mdf[mdf["Durum"]=="Açık"]
-            if not acik.empty:
-                return "uyari", str(acik.iloc[0].get("Arıza Tanımı",""))[:40], len(acik)
+            if not acik.empty: return "uyari", str(acik.iloc[0].get("Arıza Tanımı",""))[:40], len(acik)
             return "normal", "Çalışıyor", 0
 
         def grup_belirle(mak):
@@ -3798,30 +1957,19 @@ with tab_twin:
             "bilgi-yok": {"renk":"#5F5E5A","bg":"#F1EFE8","border":"#B4B2A9","ikon":"⚫","etiket":"VERİ YOK"},
         }
 
-        # KPI hesapla
         toplam_mak = len(gercek_makineler)
         kritik_mak = sum(1 for m in gercek_makineler if makine_durum(m, bolge_df)[0]=="kritik")
         uyari_mak  = sum(1 for m in gercek_makineler if makine_durum(m, bolge_df)[0]=="uyari")
         normal_mak = sum(1 for m in gercek_makineler if makine_durum(m, bolge_df)[0]=="normal")
 
-        # KPI kartları
-        kpi = ""
-        kpi += "<div style=\"display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px;\">"
-        kpi += "<div style=\"background:var(--color-background-secondary) if False else rgba(61,0,102,0.8);border:0.5px solid rgba(255,215,0,0.2);border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;\">Toplam Makine</div><div style=\"font-size:26px;font-weight:700;color:#FFD700;\">" + str(toplam_mak) + "</div></div>"
-        kpi += "<div style=\"background:rgba(74,222,128,0.08);border:0.5px solid #639922;border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#5F5E5A;text-transform:uppercase;margin-bottom:4px;\">Normal</div><div style=\"font-size:26px;font-weight:700;color:#3B6D11;\">" + str(normal_mak) + "</div></div>"
-        kpi += "<div style=\"background:rgba(239,159,39,0.08);border:0.5px solid #BA7517;border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#5F5E5A;text-transform:uppercase;margin-bottom:4px;\">Açık Talep</div><div style=\"font-size:26px;font-weight:700;color:#854F0B;\">" + str(uyari_mak) + "</div></div>"
-        kpi += "<div style=\"background:rgba(212,83,126,0.08);border:0.5px solid #D4537E;border-radius:10px;padding:12px;text-align:center;\"><div style=\"font-size:10px;color:#5F5E5A;text-transform:uppercase;margin-bottom:4px;\">Kritik</div><div style=\"font-size:26px;font-weight:700;color:#993556;\">" + str(kritik_mak) + "</div></div>"
-        kpi += "</div>"
+        st.markdown(f"""
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px;">
+          <div style="background:rgba(61,0,102,0.8);border:0.5px solid rgba(255,215,0,0.2);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#9B6FBF;text-transform:uppercase;margin-bottom:4px;">Toplam Makine</div><div style="font-size:26px;font-weight:700;color:#FFD700;">{toplam_mak}</div></div>
+          <div style="background:rgba(74,222,128,0.08);border:0.5px solid #639922;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#5F5E5A;text-transform:uppercase;margin-bottom:4px;">Normal</div><div style="font-size:26px;font-weight:700;color:#3B6D11;">{normal_mak}</div></div>
+          <div style="background:rgba(239,159,39,0.08);border:0.5px solid #BA7517;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#5F5E5A;text-transform:uppercase;margin-bottom:4px;">Açık Talep</div><div style="font-size:26px;font-weight:700;color:#854F0B;">{uyari_mak}</div></div>
+          <div style="background:rgba(212,83,126,0.08);border:0.5px solid #D4537E;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:10px;color:#5F5E5A;text-transform:uppercase;margin-bottom:4px;">Kritik</div><div style="font-size:26px;font-weight:700;color:#993556;">{kritik_mak}</div></div>
+        </div>""", unsafe_allow_html=True)
 
-        # Legend
-        legend = "<div style=\"display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;\">"
-        for d, cfg in durum_cfg.items():
-            legend += "<div style=\"display:flex;align-items:center;gap:6px;font-size:12px;color:#5F5E5A;\"><div style=\"width:10px;height:10px;border-radius:50%;background:" + cfg["border"] + ";\"></div>" + cfg["etiket"] + "</div>"
-        legend += "</div>"
-
-        st.markdown(legend + kpi, unsafe_allow_html=True)
-
-        # Makine grupları
         if not gercek_makineler:
             st.info("Makine bulunamadı. Sistem Ayarları'ndan ekleyin.")
         else:
@@ -3843,17 +1991,15 @@ with tab_twin:
                             mak_kisa = mak
                             for suf in [" (Hat A)"," (Hat B)"," (Tuzla)"," (Tuzla Depo)"," (Depo Sahası)"," (Adana LM)"," (Tuzla LM)"]:
                                 mak_kisa = mak_kisa.replace(suf,"")
-                            h  = "<div style=\"background:" + cfg["bg"] + ";border:1.5px solid " + cfg["border"] + ";border-radius:10px;padding:12px 8px;text-align:center;min-height:90px;\">"
-                            h += "<div style=\"font-size:20px;margin-bottom:4px;\">" + cfg["ikon"] + "</div>"
-                            h += "<div style=\"font-size:11px;font-weight:600;color:#2C2C2A;line-height:1.3;margin-bottom:3px;\">" + mak_kisa + "</div>"
-                            h += "<div style=\"font-size:10px;font-weight:700;color:" + cfg["renk"] + ";text-transform:uppercase;\">" + cfg["etiket"] + "</div>"
-                            if sayi > 0:
-                                h += "<div style=\"font-size:9px;color:#5F5E5A;margin-top:2px;\">" + str(sayi) + " talep</div>"
-                            h += "</div>"
+                            h  = f'<div style="background:{cfg["bg"]};border:1.5px solid {cfg["border"]};border-radius:10px;padding:12px 8px;text-align:center;min-height:90px;">'
+                            h += f'<div style="font-size:20px;margin-bottom:4px;">{cfg["ikon"]}</div>'
+                            h += f'<div style="font-size:11px;font-weight:600;color:#2C2C2A;line-height:1.3;margin-bottom:3px;">{mak_kisa}</div>'
+                            h += f'<div style="font-size:10px;font-weight:700;color:{cfg["renk"]};text-transform:uppercase;">{cfg["etiket"]}</div>'
+                            if sayi > 0: h += f'<div style="font-size:9px;color:#5F5E5A;margin-top:2px;">{sayi} talep</div>'
+                            h += '</div>'
                             st.markdown(h, unsafe_allow_html=True)
                 st.markdown("<br>", unsafe_allow_html=True)
 
-            # Makine detayı
             st.markdown("---")
             st.markdown("#### Makine Detayı")
             sec_mak = st.selectbox("Makine seç", gercek_makineler, key="twin_detay")
@@ -3861,23 +2007,17 @@ with tab_twin:
                 durum_d, aciklama_d, sayi_d = makine_durum(sec_mak, bolge_df)
                 cfg_d = durum_cfg[durum_d]
                 mak_df_d = bolge_df[bolge_df["Makine"]==sec_mak] if not bolge_df.empty and "Makine" in bolge_df.columns else pd.DataFrame()
-
                 col1, col2 = st.columns([1, 2])
                 with col1:
-                    dh  = "<div style=\"background:" + cfg_d["bg"] + ";border:2px solid " + cfg_d["border"] + ";border-radius:12px;padding:20px;text-align:center;\">"
-                    dh += "<div style=\"font-size:36px;\">" + cfg_d["ikon"] + "</div>"
-                    dh += "<div style=\"font-size:14px;font-weight:600;color:#2C2C2A;margin:8px 0 4px;\">" + sec_mak + "</div>"
-                    dh += "<div style=\"font-size:12px;font-weight:700;color:" + cfg_d["renk"] + ";text-transform:uppercase;\">" + cfg_d["etiket"] + "</div>"
-                    if aciklama_d:
-                        dh += "<div style=\"font-size:11px;color:#5F5E5A;margin-top:6px;\">" + aciklama_d + "</div>"
-                    dh += "</div>"
+                    dh = f'<div style="background:{cfg_d["bg"]};border:2px solid {cfg_d["border"]};border-radius:12px;padding:20px;text-align:center;"><div style="font-size:36px;">{cfg_d["ikon"]}</div><div style="font-size:14px;font-weight:600;color:#2C2C2A;margin:8px 0 4px;">{sec_mak}</div><div style="font-size:12px;font-weight:700;color:{cfg_d["renk"]};text-transform:uppercase;">{cfg_d["etiket"]}</div>'
+                    if aciklama_d: dh += f'<div style="font-size:11px;color:#5F5E5A;margin-top:6px;">{aciklama_d}</div>'
+                    dh += '</div>'
                     st.markdown(dh, unsafe_allow_html=True)
-
                 with col2:
                     if not mak_df_d.empty:
                         df_kap_d = mak_df_d[mak_df_d["Durum"]=="Kapalı"].copy()
                         df_kap_d["sure"] = pd.to_numeric(df_kap_d.get("Çözüm Süresi (Dk)", pd.Series(dtype=float)), errors="coerce").fillna(0)
-                        c1,c2,c3 = st.columns(3)
+                        c1, c2, c3 = st.columns(3)
                         with c1: st.metric("Toplam Arıza", len(mak_df_d))
                         with c2: st.metric("Kapatılan", len(df_kap_d))
                         with c3: st.metric("MTTR", f"{round(df_kap_d['sure'].mean(),1) if not df_kap_d.empty else 0} dk")
@@ -3886,7 +2026,158 @@ with tab_twin:
                     else:
                         st.info("Bu makine için henüz arıza kaydı bulunmuyor.")
 
+# =============================================================================
+# SEKME 10: SİSTEM AYARLARI
+# =============================================================================
 
+with tab_ayar:
+    if not giris_gerektir("Yönetici"):
+        pass
+    else:
+        st.markdown("### ⚙️ Sistem Ayarları & Kullanıcı Yönetimi")
+        col_a1, col_a2 = st.columns(2)
+
+        with col_a1:
+            st.markdown("#### 👥 Kullanıcı Listesi")
+            kullanicilar = kullanicilari_yukle()
+            for k_ad, k_bilgi in kullanicilar.items():
+                st.markdown(f'<div class="durum-karti" style="padding:12px 16px;margin-bottom:8px;"><span style="font-weight:600;color:#e2e8f0;">{k_bilgi["tam_ad"]}</span><span style="font-size:12px;color:#64748b;margin-left:8px;">@{k_ad}</span><span class="sla-badge sla-ok" style="margin-left:8px;">{k_bilgi["rol"]}</span></div>', unsafe_allow_html=True)
+
+            st.markdown("---")
+            st.markdown("#### ✏️ Kullanıcı Düzenle")
+            with st.form("kullanici_duzenle"):
+                duz_sec = st.selectbox("Düzenlenecek", list(kullanicilar.keys()), format_func=lambda k: f"{kullanicilar[k]['tam_ad']} (@{k})")
+                col_d1, col_d2 = st.columns(2)
+                with col_d1:
+                    duz_ad  = st.text_input("Ad Soyad", value=kullanicilar[duz_sec]["tam_ad"])
+                    duz_rol = st.selectbox("Rol", ["Operatör","Teknisyen","Yönetici"], index=["Operatör","Teknisyen","Yönetici"].index(kullanicilar[duz_sec]["rol"]))
+                with col_d2:
+                    duz_s1 = st.text_input("Yeni Şifre", type="password", placeholder="••••••")
+                    duz_s2 = st.text_input("Şifre Tekrar", type="password", placeholder="••••••")
+                if st.form_submit_button("💾 Kaydet", use_container_width=True):
+                    if duz_s1 and duz_s1 != duz_s2:
+                        st.error("❌ Şifreler eşleşmiyor!")
+                    else:
+                        gv = {"tam_ad": duz_ad.strip() or kullanicilar[duz_sec]["tam_ad"], "rol": duz_rol}
+                        if duz_s1: gv["sifre_hash"] = sifre_hashle(duz_s1)
+                        sb_update("kullanicilar", f"kullanici_adi=eq.{duz_sec}", gv)
+                        cache_temizle()
+                        log_yaz("KULLANICI GÜNCELLENDİ", f"{duz_sec}→{duz_rol}")
+                        st.success(f"✅ {duz_sec} güncellendi!")
+                        st.rerun()
+
+            st.markdown("---")
+            st.markdown("#### ➕ Yeni Kullanıcı Ekle")
+            with st.form("yeni_kullanici"):
+                col_u1, col_u2 = st.columns(2)
+                with col_u1:
+                    y_kul  = st.text_input("Kullanıcı Adı")
+                    y_sif  = st.text_input("Şifre", type="password")
+                with col_u2:
+                    y_ad2  = st.text_input("Ad Soyad")
+                    y_rol2 = st.selectbox("Rol", ["Operatör","Teknisyen","Yönetici"])
+                if st.form_submit_button("Kullanıcı Oluştur", use_container_width=True):
+                    if not all([y_kul, y_sif, y_ad2]): st.error("Tüm alanlar zorunludur.")
+                    elif y_kul.lower() in kullanicilar: st.error("Bu kullanıcı adı zaten mevcut.")
+                    else:
+                        sb_insert("kullanicilar", {"kullanici_adi": y_kul.lower(), "sifre_hash": sifre_hashle(y_sif), "rol": y_rol2, "tam_ad": y_ad2})
+                        cache_temizle()
+                        log_yaz("KULLANICI OLUŞTURULDU", f"{y_kul} — {y_rol2}")
+                        st.success(f"✅ {y_ad2} ({y_rol2}) oluşturuldu!")
+                        st.rerun()
+
+        with col_a2:
+            st.markdown("#### 🏭 Makine Listesi Yönetimi")
+            with st.expander("Makine Ekle / Sil", expanded=False):
+                mk_rows = sb_select("makine_listesi", "aktif=eq.true")
+                if mk_rows:
+                    df_mk = pd.DataFrame(mk_rows)[["bolge","makine_adi"]]
+                    df_mk.columns = ["Bölge","Makine Adı"]
+                    st.dataframe(df_mk, use_container_width=True, hide_index=True)
+                else:
+                    st.caption("Henüz eklenmemiş — sabit liste kullanılıyor.")
+                with st.form("makine_ekle"):
+                    m_bolge = st.selectbox("Bölge", BOLGELER, key="mb")
+                    m_ad    = st.text_input("Makine Adı", placeholder="Örn: VNA-05 (Hat C)")
+                    if st.form_submit_button("➕ Ekle", use_container_width=True) and m_ad.strip():
+                        sb_insert("makine_listesi", {"bolge": m_bolge, "makine_adi": m_ad.strip(), "aktif": True})
+                        cache_temizle()
+                        log_yaz("MAKİNE EKLENDİ", f"{m_bolge} — {m_ad}")
+                        st.success(f"✅ {m_ad} eklendi!")
+                        st.rerun()
+
+            st.markdown("---")
+            st.markdown("#### 📜 Sistem Aktivite Logu")
+            try:
+                log_rows = sb_select("sistem_log")
+                if log_rows:
+                    df_log = pd.DataFrame(log_rows).rename(columns={"zaman":"Zaman","kullanici":"Kullanıcı","islem":"İşlem","detay":"Detay"})
+                    st.dataframe(df_log.sort_values("Zaman", ascending=False).head(50), use_container_width=True, hide_index=True)
+                    st.download_button("📥 Log İndir", df_log.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"), file_name=f"log_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv")
+                else:
+                    st.info("Henüz log kaydı yok.")
+            except Exception as e:
+                st.info(f"Log yüklenemedi: {e}")
+
+            st.markdown("---")
+            st.markdown("#### 📊 Haftalık Rapor & Email Ayarları")
+            try:
+                rapor_log = sb_select("haftalik_rapor_log")
+                if rapor_log:
+                    son = rapor_log[0]
+                    st.success(f"✅ Son rapor: **{son.get('gonderim_tarihi','')}** — {son.get('durum','')}")
+            except:
+                pass
+
+            if st.button("📧 Anlık Durum Raporu Gönder", use_container_width=True):
+                with st.spinner("Rapor hazırlanıyor..."):
+                    try:
+                        df_test = ariza_df_getir()
+                        acik_t   = len(df_test[df_test["Durum"]=="Açık"]) if not df_test.empty and "Durum" in df_test.columns else 0
+                        kritik_t = len(df_test[(df_test["Durum"]=="Açık") & (df_test["Öncelik"].str.startswith("🔴",na=False))]) if not df_test.empty else 0
+                        ok = email_gonder("[TEST] Anlık Bakım Raporu", f"Toplam: {len(df_test)} | Açık: {acik_t} | Kritik: {kritik_t}")
+                        if ok: st.success("✅ Rapor gönderildi!")
+                        else:  st.error("❌ Email gönderilemedi. Ayarları kontrol edin.")
+                    except Exception as e:
+                        st.error(f"❌ Hata: {e}")
+
+            try:
+                gonderici = st.secrets["email"]["gonderici"]
+                alici     = st.secrets["email"]["alici"]
+                st.success(f"✅ Email: **{gonderici}** → **{alici}**")
+            except KeyError:
+                st.warning("⚠️ Email henüz yapılandırılmamış.")
+
+            st.markdown("---")
+            st.markdown("#### 🗄️ Veri Yedekleme")
+            col_bk1, col_bk2 = st.columns(2)
+            with col_bk1:
+                df_y = ariza_df_getir()
+                if not df_y.empty:
+                    st.download_button("💾 Arıza DB", df_y.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"), file_name=f"ariza_db_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv", use_container_width=True)
+            with col_bk2:
+                df_sy = stok_df_getir()
+                if not df_sy.empty:
+                    st.download_button("💾 Stok DB", df_sy.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"), file_name=f"stok_db_{datetime.now().strftime('%Y%m%d')}.csv", mime="text/csv", use_container_width=True)
+
+        st.markdown("---")
+        with st.expander("🗑️ Tehlikeli İşlemler (Veri Temizleme)"):
+            st.warning("⚠️ Bu işlemler geri alınamaz!")
+            col_d1, col_d2 = st.columns(2)
+            with col_d1:
+                if st.button("🗑️ Kapalı Talepleri Temizle", use_container_width=True):
+                    sb_delete("ariza_kayitlari", "durum=eq.Kapalı")
+                    cache_temizle()
+                    log_yaz("VERİ TEMİZLEME", "Kapalı talepler silindi")
+                    st.success("Temizlendi.")
+                    st.rerun()
+            with col_d2:
+                if st.button("🗑️ Sistem Logunu Temizle", use_container_width=True):
+                    sb_delete("sistem_log", "id=gt.0")
+                    st.success("Log temizlendi.")
+                    st.rerun()
+
+# =============================================================================
 # FOOTER
 # =============================================================================
 

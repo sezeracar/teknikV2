@@ -1119,19 +1119,33 @@ tab_pano, tab_yeni, tab_kapat, tab_rapor, tab_stok, tab_bakim, tab_oee, tab_ai, 
 # =============================================================================
 
 with tab_pano:
-    if not st.session_state.get("oturum_acik", False):
+   if not st.session_state.get("oturum_acik", False):
         st.markdown("""
-        <div style="text-align:center;padding:80px 20px;">
-          <div style="font-size:64px;margin-bottom:20px;">🛡️</div>
-          <div style="font-size:24px;font-weight:800;color:#FFD700;margin-bottom:8px;">TeknikPro CMMS v2.0</div>
-          <div style="font-size:14px;color:#C89EE8;margin-bottom:32px;">Enterprise Bakım & Arıza Yönetim Sistemi<br>Adana LM & Tuzla LM</div>
-          <div style="background:rgba(61,0,102,0.8);border:1px solid rgba(255,215,0,0.2);border-radius:16px;
-                      padding:32px;max-width:400px;margin:0 auto;">
-            <div style="font-size:40px;margin-bottom:12px;">🔒</div>
-            <div style="font-size:18px;font-weight:700;color:#FFD700;margin-bottom:8px;">Verileri görmek için giriş yapın</div>
-            <div style="font-size:13px;color:#9B6FBF;">Sol paneldeki giriş formunu kullanın</div>
-          </div>
+        <div style="text-align:center;padding:40px 20px 20px;">
+          <div style="font-size:64px;margin-bottom:12px;">🛡️</div>
+          <div style="font-size:24px;font-weight:800;color:#FFD700;margin-bottom:4px;">TeknikPro CMMS v2.0</div>
+          <div style="font-size:14px;color:#C89EE8;margin-bottom:24px;">Enterprise Bakım & Arıza Yönetim Sistemi<br>Adana LM & Tuzla LM</div>
         </div>""", unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            kullanicilar = kullanicilari_yukle()
+            with st.form("ana_giris_formu", clear_on_submit=True):
+                st.markdown("<div style='text-align:center;font-size:20px;font-weight:700;color:#FFD700;margin-bottom:16px;'>🔐 Sistem Girişi</div>", unsafe_allow_html=True)
+                k = st.text_input("Kullanıcı Adı", placeholder="kullanici_adi")
+                s = st.text_input("Şifre", type="password", placeholder="••••••")
+                giris = st.form_submit_button("Giriş Yap →", use_container_width=True)
+                if giris:
+                    k = k.strip().lower()
+                    if k in kullanicilar and kullanicilar[k]["sifre"] == sifre_hashle(s):
+                        st.session_state.oturum_acik     = True
+                        st.session_state.aktif_kullanici = k
+                        st.session_state.aktif_tam_ad    = kullanicilar[k]["tam_ad"]
+                        st.session_state.aktif_rol       = kullanicilar[k]["rol"]
+                        log_yaz("GİRİŞ", f"{kullanicilar[k]['tam_ad']} sisteme giriş yaptı")
+                        st.rerun()
+                    else:
+                        st.error("❌ Hatalı kullanıcı adı veya şifre.")
     else:
         col_ref, _ = st.columns([1,8])
         with col_ref:

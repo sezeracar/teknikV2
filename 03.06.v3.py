@@ -1144,7 +1144,7 @@ with tab_pano:
                         st.session_state.aktif_rol       = kullanicilar[k]["rol"]
                         log_yaz("GİRİŞ", f"{kullanicilar[k]['tam_ad']} sisteme giriş yaptı")
                         st.rerun()
-                    else:
+                        else:
                         st.error("❌ Hatalı kullanıcı adı veya şifre.")
     else:
         col_ref, _ = st.columns([1,8])

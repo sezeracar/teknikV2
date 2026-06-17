@@ -559,22 +559,11 @@ def sidebar_giris():
         st.markdown("---")
         kullanicilar = kullanicilari_yukle()
         if not st.session_state.get("oturum_acik", False):
-            st.markdown("### 🔐 Sistem Girişi")
-            with st.form("sidebar_giris", clear_on_submit=True):
-                k = st.text_input("Kullanıcı Adı", placeholder="kullanici_adi")
-                s = st.text_input("Şifre", type="password", placeholder="••••••")
-                giris = st.form_submit_button("Giriş Yap →", use_container_width=True)
-                if giris:
-                    k = k.strip().lower()
-                    if k in kullanicilar and kullanicilar[k]["sifre"] == sifre_hashle(s):
-                        st.session_state.oturum_acik     = True
-                        st.session_state.aktif_kullanici = k
-                        st.session_state.aktif_tam_ad    = kullanicilar[k]["tam_ad"]
-                        st.session_state.aktif_rol       = kullanicilar[k]["rol"]
-                        log_yaz("GİRİŞ", f"{kullanicilar[k]['tam_ad']} sisteme giriş yaptı")
-                        st.rerun()
-                    else:
-                        st.error("Hatalı kimlik bilgileri.")
+            st.markdown("""
+            <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;text-align:center;">
+              <div style="font-size:24px;margin-bottom:6px;">🔒</div>
+              <div style="font-size:12px;color:#C89EE8;">Giriş yapmak için<br>ana sayfadaki formu kullanın</div>
+            </div>""", unsafe_allow_html=True)
         else:
             tam_ad = st.session_state.aktif_tam_ad
             rol    = st.session_state.aktif_rol

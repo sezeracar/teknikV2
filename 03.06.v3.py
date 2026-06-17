@@ -559,10 +559,32 @@ def sidebar_giris():
         st.markdown("---")
         kullanicilar = kullanicilari_yukle()
         if not st.session_state.get("oturum_acik", False):
-            st.markdown("""
-            <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.2);border-radius:10px;padding:14px 16px;text-align:center;">
-              <div style="font-size:24px;margin-bottom:6px;">🔒</div>
-              <div style="font-size:12px;color:#C89EE8;">Giriş yapmak için<br>ana sayfadaki formu kullanın</div>
+            try:
+                df_durum = ariza_df_getir()
+                if not df_durum.empty and "Durum" in df_durum.columns:
+                    _k = len(df_durum[(df_durum["Durum"]=="Açık") & (df_durum["Öncelik"].str.startswith("🔴",na=False))])
+                    _a = len(df_durum[df_durum["Durum"]=="Açık"])
+                else:
+                    _k, _a = 0, 0
+            except:
+                _k, _a = 0, 0
+
+            if _k >= 3:
+                emoji, baslik, mesaj, renk = "🚨", "Yoğun Gün", f"{_k} kritik arıza aktif — ekip tam gaz çalışıyor", "#E91E8C"
+            elif _k > 0:
+                emoji, baslik, mesaj, renk = "⚡", "Dikkat Gerekli", f"{_k} kritik arıza müdahale bekliyor", "#FFD700"
+            elif _a >= 8:
+                emoji, baslik, mesaj, renk = "📋", "Yoğun Trafik", f"{_a} açık talep var, sistem çalışıyor", "#C89EE8"
+            elif _a > 0:
+                emoji, baslik, mesaj, renk = "🛠️", "Her Şey Kontrol Altında", f"{_a} açık talep takipte", "#9B6FBF"
+            else:
+                emoji, baslik, mesaj, renk = "✅", "Tertemiz!", "Açık arıza yok, tesis sakin", "#4ade80"
+
+            st.markdown(f"""
+            <div style="background:rgba(61,0,102,0.6);border:1px solid {renk}44;border-radius:10px;padding:16px;text-align:center;">
+              <div style="font-size:28px;margin-bottom:6px;">{emoji}</div>
+              <div style="font-size:13px;font-weight:700;color:{renk};margin-bottom:4px;">{baslik}</div>
+              <div style="font-size:11px;color:#9B6FBF;line-height:1.4;">{mesaj}</div>
             </div>""", unsafe_allow_html=True)
         else:
             tam_ad = st.session_state.aktif_tam_ad

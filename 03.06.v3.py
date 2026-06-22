@@ -349,15 +349,37 @@ def log_yaz(islem, detay=""):
         "detay":     detay
     })
 
-def email_gonder(konu, icerik):
+def email_alicilari_getir(kategori):
+    """
+    kategori: 'kritik_ariza' | 'haftalik_rapor' | 'stok_uyari' | 'talep_kapatma'
+    Aktif ve ilgili kategoriye işaretli alıcıların email adreslerini döndürür.
+    """
+    try:
+        rows = sb_select("email_alicilar", f"aktif=eq.true&{kategori}=eq.true")
+        return [r["email"].strip() for r in rows if r.get("email")]
+    except Exception:
+        return []
+
+def email_gonder(konu, icerik, kategori="haftalik_rapor"):
     try:
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
         gonderici = st.secrets["email"]["gonderici"]
         sifre     = st.secrets["email"]["sifre"]
-        alici_str = st.secrets["email"]["alici"]
-        alicilar  = [a.strip() for a in alici_str.split(",") if a.strip()]
+
+        alicilar = email_alicilari_getir(kategori)
+        if not alicilar:
+            # DB'de tanımlı/aktif alıcı yoksa secrets'taki sabit listeye düş (geriye uyumluluk)
+            try:
+                alici_str = st.secrets["email"]["alici"]
+                alicilar  = [a.strip() for a in alici_str.split(",") if a.strip()]
+            except Exception:
+                alicilar = []
+
+        if not alicilar:
+            return False
+
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"[TeknikPro CMMS] {konu}"
         msg["From"]    = f"TeknikPro CMMS <{gonderici}>"
@@ -447,7 +469,7 @@ def haftalik_rapor_gonder():
         icerik = f"""Geçen haftanın ({gecen_pzt.strftime('%d/%m/%Y')} - {gecen_paz.strftime('%d/%m/%Y')}) bakım ve arıza özeti:\n\nBu Hafta Açılan: {toplam_h} | Kapatılan: {kapali_h} | SLA Uyum: %{sla_oran_h} | MTTR: {ort_mttr_h} dk\n\nKritik Açık:\n{kritik_txt}\n\nEn Sorunlu Makineler:\n{en_sorunlu_txt}"""
         konu = f"📊 Haftalık Bakım Raporu — {gecen_pzt.strftime('%d/%m')} - {gecen_paz.strftime('%d/%m/%Y')}"
 
-        basari = email_gonder(konu, icerik)
+        basari = email_gonder(konu, icerik, kategori="haftalik_rapor")
         sb_update("haftalik_rapor_log", f"hafta=eq.{hafta_no}", {
             "durum": "Gönderildi" if basari else "Hata"
         })
@@ -1051,7 +1073,8 @@ with tab_yeni:
                     if "KRİTİK" in oncelik or "YÜKSEK" in oncelik:
                         email_gonder(
                             f"🚨 {oncelik[:10]} Arıza — {makine} ({secili_bolge})",
-                            f"Talep No: {no}\nBölge: {secili_bolge}\nMakine: {makine}\nÖncelik: {oncelik}\nTanım: {ariza_tanimi.strip()}\nBildiren: {bildiren.strip()}"
+                            f"Talep No: {no}\nBölge: {secili_bolge}\nMakine: {makine}\nÖncelik: {oncelik}\nTanım: {ariza_tanimi.strip()}\nBildiren: {bildiren.strip()}",
+                            kategori="kritik_ariza"
                         )
                     st.success(f"✅ Talep **{no}** oluşturuldu! Bölge: {secili_bolge} | SLA: {sla_bilgi['sla_dk']} dk")
                     time.sleep(1)
@@ -1310,7 +1333,8 @@ with tab_kapat:
                                 if "KRİTİK" in str(talep.get("Öncelik", "")) or "YÜKSEK" in str(talep.get("Öncelik", "")):
                                     email_gonder(
                                         f"✅ Talep Kapatıldı — {talep.get('Makine', '')}",
-                                        f"Talep No: {secilen_no}\nMakine: {talep.get('Makine','')}\nSüre: {cozum_dk} dk\nSLA: {sla_s['durum']}\nMaliyet: {toplam_maliyet_k:,.0f} TL"
+                                        f"Talep No: {secilen_no}\nMakine: {talep.get('Makine','')}\nSüre: {cozum_dk} dk\nSLA: {sla_s['durum']}\nMaliyet: {toplam_maliyet_k:,.0f} TL",
+                                        kategori="talep_kapatma"
                                     )
                                 st.success(f"✅ Talep **{secilen_no}** kapatıldı! Süre: {cozum_dk} dk | Toplam: {toplam_maliyet_k:,.0f} TL | {sla_s['durum']}")
                                 time.sleep(1.5)
@@ -1479,7 +1503,7 @@ with tab_stok:
                             if not satir.empty:
                                 krit_sev = int(satir["Kritik Seviye"].values[0])
                                 if yeni_m <= krit_sev:
-                                    email_gonder(f"⚠️ Kritik Stok — {secilen_mal}", f"Mevcut: {yeni_m} | Kritik: {krit_sev}")
+                                    email_gonder(f"⚠️ Kritik Stok — {secilen_mal}", f"Mevcut: {yeni_m} | Kritik: {krit_sev}", kategori="stok_uyari")
                         except:
                             pass
                         st.success(f"✅ {secilen_mal}: {mev} → **{yeni_m}**")
@@ -2161,6 +2185,95 @@ with tab_ayar:
                     st.info("Henüz log kaydı yok.")
             except Exception as e:
                 st.info(f"Log yüklenemedi: {e}")
+
+            st.markdown("---")
+            st.markdown("#### 📧 Email Alıcı Yönetimi")
+            st.caption("Hangi bildirim türünü kimin alacağını buradan yönetebilirsiniz.")
+
+            alici_rows = sb_select("email_alicilar")
+            if alici_rows:
+                df_alici = pd.DataFrame(alici_rows)
+                gosterim_kol = ["ad", "email", "kritik_ariza", "haftalik_rapor", "stok_uyari", "talep_kapatma", "aktif"]
+                gosterim_kol = [c for c in gosterim_kol if c in df_alici.columns]
+                df_goster = df_alici[gosterim_kol].rename(columns={
+                    "ad": "Ad", "email": "E-posta", "kritik_ariza": "Kritik Arıza",
+                    "haftalik_rapor": "Haftalık Rapor", "stok_uyari": "Stok Uyarısı",
+                    "talep_kapatma": "Talep Kapatma", "aktif": "Aktif"
+                })
+                st.dataframe(df_goster, use_container_width=True, hide_index=True)
+            else:
+                st.caption("Henüz alıcı tanımlanmamış — secrets.toml'daki sabit liste kullanılıyor.")
+
+            with st.expander("✏️ Alıcı Ekle / Düzenle"):
+                duzenleme_modu = st.radio("İşlem", ["➕ Yeni Alıcı Ekle", "✏️ Mevcut Alıcıyı Düzenle"], horizontal=True, key="alici_islem")
+
+                if duzenleme_modu == "➕ Yeni Alıcı Ekle":
+                    with st.form("yeni_alici_formu", clear_on_submit=True):
+                        ya_ad    = st.text_input("Ad Soyad")
+                        ya_email = st.text_input("E-posta *")
+                        col_ya1, col_ya2 = st.columns(2)
+                        with col_ya1:
+                            ya_kritik   = st.checkbox("🚨 Kritik/Yüksek Arıza Bildirimleri", value=True)
+                            ya_haftalik = st.checkbox("📊 Haftalık Rapor", value=True)
+                        with col_ya2:
+                            ya_stok    = st.checkbox("📦 Kritik Stok Uyarısı", value=True)
+                            ya_kapatma = st.checkbox("✅ Talep Kapatma Bildirimi", value=False)
+                        if st.form_submit_button("✅ Alıcı Ekle", use_container_width=True):
+                            if not ya_email.strip():
+                                st.error("❌ E-posta zorunludur.")
+                            else:
+                                sb_insert("email_alicilar", {
+                                    "ad": ya_ad.strip(), "email": ya_email.strip(),
+                                    "aktif": True, "kritik_ariza": ya_kritik,
+                                    "haftalik_rapor": ya_haftalik, "stok_uyari": ya_stok,
+                                    "talep_kapatma": ya_kapatma
+                                })
+                                log_yaz("EMAIL ALICI EKLENDİ", ya_email.strip())
+                                st.success(f"✅ {ya_email} eklendi!")
+                                time.sleep(0.8)
+                                st.rerun()
+                else:
+                    if not alici_rows:
+                        st.info("Düzenlenecek alıcı bulunmuyor. Önce bir alıcı ekleyin.")
+                    else:
+                        secim_str = [f"[ID:{r['id']}] {r.get('ad','')} — {r.get('email','')}" for r in alici_rows]
+                        secilen_str = st.selectbox("Düzenlenecek Alıcı", secim_str, key="alici_duzenle_sec")
+                        secilen_id = int(secilen_str.split("ID:")[1].split("]")[0])
+                        secilen_row = next(r for r in alici_rows if r["id"] == secilen_id)
+                        with st.form("alici_duzenle_formu"):
+                            da_ad    = st.text_input("Ad Soyad", value=secilen_row.get("ad", "") or "")
+                            da_email = st.text_input("E-posta", value=secilen_row.get("email", "") or "")
+                            col_da1, col_da2 = st.columns(2)
+                            with col_da1:
+                                da_kritik   = st.checkbox("🚨 Kritik/Yüksek Arıza", value=bool(secilen_row.get("kritik_ariza", True)))
+                                da_haftalik = st.checkbox("📊 Haftalık Rapor", value=bool(secilen_row.get("haftalik_rapor", True)))
+                            with col_da2:
+                                da_stok     = st.checkbox("📦 Kritik Stok Uyarısı", value=bool(secilen_row.get("stok_uyari", True)))
+                                da_kapatma  = st.checkbox("✅ Talep Kapatma", value=bool(secilen_row.get("talep_kapatma", False)))
+                            da_aktif = st.checkbox("Aktif", value=bool(secilen_row.get("aktif", True)))
+                            col_kaydet, col_sil = st.columns(2)
+                            with col_kaydet:
+                                guncelle_btn = st.form_submit_button("💾 Güncelle", use_container_width=True)
+                            with col_sil:
+                                sil_btn = st.form_submit_button("🗑️ Sil", use_container_width=True)
+
+                            if guncelle_btn:
+                                sb_update("email_alicilar", f"id=eq.{secilen_id}", {
+                                    "ad": da_ad.strip(), "email": da_email.strip(),
+                                    "kritik_ariza": da_kritik, "haftalik_rapor": da_haftalik,
+                                    "stok_uyari": da_stok, "talep_kapatma": da_kapatma,
+                                    "aktif": da_aktif
+                                })
+                                log_yaz("EMAIL ALICI GÜNCELLENDİ", da_email.strip())
+                                st.success("✅ Güncellendi!")
+                                time.sleep(0.8)
+                                st.rerun()
+                            if sil_btn:
+                                sb_delete("email_alicilar", f"id=eq.{secilen_id}")
+                                log_yaz("EMAIL ALICI SİLİNDİ", secilen_row.get("email", ""))
+                                st.success("Silindi.")
+                                time.sleep(0.8)
+                                st.rerun()
 
             st.markdown("---")
             st.markdown("#### 📊 Haftalık Rapor & Email Ayarları")

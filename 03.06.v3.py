@@ -380,17 +380,46 @@ def email_gonder(konu, icerik):
         return False
 
 def haftalik_rapor_gonder():
+    """
+    Haftalık bakım raporu gönderimi.
+
+    ÖNEMLİ — RACE CONDITION DÜZELTMESİ:
+    Streamlit her kullanıcı etkileşiminde / rerun'da bu fonksiyonu modül seviyesinde
+    tekrar çağırır. Eski mantıkta önce "gönderildi mi" kontrolü yapılıp, sonra mail
+    gönderilip, sonra kayıt yazılıyordu. Bu üç adım arasındaki zaman boşluğunda
+    aynı anda gelen birden fazla rerun, hepsi "henüz gönderilmemiş" görüp mail
+    gönderebiliyordu.
+
+    Yeni mantık: önce bir "kilit" satırı insert edilmeye çalışılır. Veritabanındaki
+    haftalik_rapor_log.hafta kolonu üzerinde UNIQUE constraint olduğu için, aynı
+    hafta_no için ikinci insert veritabanı seviyesinde reddedilir (kilit_ok=False)
+    ve fonksiyon hemen çıkar. Sadece kilidi başarıyla alan tek instance mail
+    gönderip durumu günceller. Bu, check-then-act yarışını ortadan kaldırır.
+
+    Gerekli SQL (bir kez çalıştırılmalı):
+        ALTER TABLE haftalik_rapor_log ADD CONSTRAINT hafta_unique UNIQUE (hafta);
+    """
     try:
         bugun = date.today()
         if bugun.weekday() != 0:
             return
         hafta_no = bugun.strftime("%Y-W%W")
-        mevcut = sb_select("haftalik_rapor_log", f"hafta=eq.{hafta_no}&durum=eq.Gönderildi")
-        if mevcut:
-            return
+
+        # ÖNCE kilit satırını yazmayı dene. Unique constraint sayesinde aynı hafta
+        # için ikinci insert başarısız olur -> mail tekrar gitmez.
+        kilit_ok = sb_insert("haftalik_rapor_log", {
+            "gonderim_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "hafta": hafta_no,
+            "durum": "Gönderiliyor"
+        })
+        if not kilit_ok:
+            return  # Bu hafta için kilit zaten alınmış (başka rerun veya zaten gönderilmiş)
+
         df_h = ariza_df_getir()
         if df_h.empty:
+            sb_update("haftalik_rapor_log", f"hafta=eq.{hafta_no}", {"durum": "Hata-BosVeri"})
             return
+
         gecen_pzt = bugun - timedelta(days=7)
         gecen_paz = bugun - timedelta(days=1)
         try:
@@ -417,8 +446,11 @@ def haftalik_rapor_gonder():
         kritik_txt = kritik_txt or "  • Kritik açık talep yok ✅"
         icerik = f"""Geçen haftanın ({gecen_pzt.strftime('%d/%m/%Y')} - {gecen_paz.strftime('%d/%m/%Y')}) bakım ve arıza özeti:\n\nBu Hafta Açılan: {toplam_h} | Kapatılan: {kapali_h} | SLA Uyum: %{sla_oran_h} | MTTR: {ort_mttr_h} dk\n\nKritik Açık:\n{kritik_txt}\n\nEn Sorunlu Makineler:\n{en_sorunlu_txt}"""
         konu = f"📊 Haftalık Bakım Raporu — {gecen_pzt.strftime('%d/%m')} - {gecen_paz.strftime('%d/%m/%Y')}"
+
         basari = email_gonder(konu, icerik)
-        sb_insert("haftalik_rapor_log", {"gonderim_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"), "hafta": hafta_no, "durum": "Gönderildi" if basari else "Hata"})
+        sb_update("haftalik_rapor_log", f"hafta=eq.{hafta_no}", {
+            "durum": "Gönderildi" if basari else "Hata"
+        })
     except Exception as e:
         print(f"Haftalık rapor hatası: {e}")
 

@@ -2240,17 +2240,17 @@ with tab_ayar:
                         secilen_str = st.selectbox("Düzenlenecek Alıcı", secim_str, key="alici_duzenle_sec")
                         secilen_id = int(secilen_str.split("ID:")[1].split("]")[0])
                         secilen_row = next(r for r in alici_rows if r["id"] == secilen_id)
-                        with st.form("alici_duzenle_formu"):
-                            da_ad    = st.text_input("Ad Soyad", value=secilen_row.get("ad", "") or "")
-                            da_email = st.text_input("E-posta", value=secilen_row.get("email", "") or "")
+                        with st.form(f"alici_duzenle_formu_{secilen_id}"):
+                            da_ad    = st.text_input("Ad Soyad", value=secilen_row.get("ad", "") or "", key=f"da_ad_{secilen_id}")
+                            da_email = st.text_input("E-posta", value=secilen_row.get("email", "") or "", key=f"da_email_{secilen_id}")
                             col_da1, col_da2 = st.columns(2)
                             with col_da1:
-                                da_kritik   = st.checkbox("🚨 Kritik/Yüksek Arıza", value=bool(secilen_row.get("kritik_ariza", True)))
-                                da_haftalik = st.checkbox("📊 Haftalık Rapor", value=bool(secilen_row.get("haftalik_rapor", True)))
+                                da_kritik   = st.checkbox("🚨 Kritik/Yüksek Arıza", value=bool(secilen_row.get("kritik_ariza", True)), key=f"da_kritik_{secilen_id}")
+                                da_haftalik = st.checkbox("📊 Haftalık Rapor", value=bool(secilen_row.get("haftalik_rapor", True)), key=f"da_haftalik_{secilen_id}")
                             with col_da2:
-                                da_stok     = st.checkbox("📦 Kritik Stok Uyarısı", value=bool(secilen_row.get("stok_uyari", True)))
-                                da_kapatma  = st.checkbox("✅ Talep Kapatma", value=bool(secilen_row.get("talep_kapatma", False)))
-                            da_aktif = st.checkbox("Aktif", value=bool(secilen_row.get("aktif", True)))
+                                da_stok     = st.checkbox("📦 Kritik Stok Uyarısı", value=bool(secilen_row.get("stok_uyari", True)), key=f"da_stok_{secilen_id}")
+                                da_kapatma  = st.checkbox("✅ Talep Kapatma", value=bool(secilen_row.get("talep_kapatma", False)), key=f"da_kapatma_{secilen_id}")
+                            da_aktif = st.checkbox("Aktif", value=bool(secilen_row.get("aktif", True)), key=f"da_aktif_{secilen_id}")
                             col_kaydet, col_sil = st.columns(2)
                             with col_kaydet:
                                 guncelle_btn = st.form_submit_button("💾 Güncelle", use_container_width=True)
@@ -2258,16 +2258,22 @@ with tab_ayar:
                                 sil_btn = st.form_submit_button("🗑️ Sil", use_container_width=True)
 
                             if guncelle_btn:
-                                sb_update("email_alicilar", f"id=eq.{secilen_id}", {
-                                    "ad": da_ad.strip(), "email": da_email.strip(),
-                                    "kritik_ariza": da_kritik, "haftalik_rapor": da_haftalik,
-                                    "stok_uyari": da_stok, "talep_kapatma": da_kapatma,
-                                    "aktif": da_aktif
-                                })
-                                log_yaz("EMAIL ALICI GÜNCELLENDİ", da_email.strip())
-                                st.success("✅ Güncellendi!")
-                                time.sleep(0.8)
-                                st.rerun()
+                                if not da_email.strip():
+                                    st.error("❌ E-posta boş olamaz.")
+                                else:
+                                    guncelleme_ok = sb_update("email_alicilar", f"id=eq.{secilen_id}", {
+                                        "ad": da_ad.strip(), "email": da_email.strip(),
+                                        "kritik_ariza": da_kritik, "haftalik_rapor": da_haftalik,
+                                        "stok_uyari": da_stok, "talep_kapatma": da_kapatma,
+                                        "aktif": da_aktif
+                                    })
+                                    if guncelleme_ok:
+                                        log_yaz("EMAIL ALICI GÜNCELLENDİ", da_email.strip())
+                                        st.success("✅ Güncellendi!")
+                                        time.sleep(0.8)
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Güncelleme başarısız oldu. Supabase bağlantısını kontrol edin.")
                             if sil_btn:
                                 sb_delete("email_alicilar", f"id=eq.{secilen_id}")
                                 log_yaz("EMAIL ALICI SİLİNDİ", secilen_row.get("email", ""))

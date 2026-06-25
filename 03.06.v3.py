@@ -272,6 +272,25 @@ def ariza_turu_db():
     except Exception:
         return {}
 
+# ── YENİ: Bakım Türü Listesi (dinamik) ──────────────────────────────────────
+def bakim_turu_db():
+    """
+    bakim_turu_listesi tablosundan aktif bakım türlerini çeker.
+    Tablo: id (bigint, identity), bakim_turu (text), aktif (bool), created_at (timestamptz)
+    """
+    try:
+        rows = sb_select("bakim_turu_listesi", "aktif=eq.true")
+        if not rows:
+            return []
+        return [r["bakim_turu"] for r in rows if r.get("bakim_turu")]
+    except Exception:
+        return []
+
+def aktif_bakim_turleri():
+    db = bakim_turu_db()
+    return db if db else BAKIM_TURLERI
+# ─────────────────────────────────────────────────────────────────────────────
+
 def aktif_makine_listesi():
     db = makine_listesi_db()
     return db if db else MAKINE_LISTESI_BOLGE
@@ -1650,7 +1669,7 @@ with tab_bakim:
             with st.form("bakim_ekle_formu"):
                 bp_bolge    = st.selectbox("Bölge *", BOLGELER, key="bp_bolge")
                 bp_makine   = st.selectbox("Makine *", aktif_makine_listesi().get(bp_bolge, MAKINE_LISTESI_BOLGE[bp_bolge]), key="bp_makine")
-                bp_tur      = st.selectbox("Bakım Türü *", BAKIM_TURLERI, key="bp_tur")
+                bp_tur      = st.selectbox("Bakım Türü *", aktif_bakim_turleri(), key="bp_tur")
                 bp_periyot  = st.selectbox("Periyot *", list(PERIYOTLAR.keys()), key="bp_periyot")
                 bp_aciklama = st.text_area("Açıklama", height=100, key="bp_aciklama")
                 bp_sorumlu  = st.text_input("Sorumlu Teknisyen", key="bp_sorumlu", value=st.session_state.get("aktif_tam_ad", ""))
@@ -1682,6 +1701,58 @@ with tab_bakim:
                     log_yaz("BAKIM PLANI SİLİNDİ", f"ID:{sil_id}")
                     st.success("Silindi.")
                     st.rerun()
+
+        # ── YENİ: Bakım Türü Yönetimi ───────────────────────────────────────
+        st.markdown("---")
+        st.markdown("### 🔧 Bakım Türü Yönetimi")
+        st.caption("Yukarıdaki 'Bakım Türü' seçim kutusunda görünen değerleri buradan ekleyip kaldırabilirsiniz.")
+        col_bt1, col_bt2 = st.columns([3, 2])
+        with col_bt1:
+            bt_rows = sb_select("bakim_turu_listesi", "aktif=eq.true")
+            if bt_rows:
+                df_bt = pd.DataFrame(bt_rows)
+                gos_bt = [c for c in ["id", "bakim_turu"] if c in df_bt.columns]
+                df_bt_g = df_bt[gos_bt].rename(columns={"id": "ID", "bakim_turu": "Bakım Türü"})
+                st.dataframe(df_bt_g, use_container_width=True, hide_index=True)
+            else:
+                st.caption("Henüz eklenmemiş — sabit varsayılan liste kullanılıyor (aşağıda görebilirsiniz).")
+                st.write(", ".join(BAKIM_TURLERI))
+
+        with col_bt2:
+            st.markdown("#### ➕ Yeni Bakım Türü Ekle")
+            with st.form("bakim_turu_ekle_formu"):
+                bt_ad = st.text_input("Bakım Türü Adı *", placeholder="Örn: Termal Kamera Kontrolü")
+                if st.form_submit_button("➕ Ekle", use_container_width=True):
+                    if not bt_ad.strip():
+                        st.error("❌ Bakım türü adı zorunludur.")
+                    else:
+                        mevcutlar = [r.get("bakim_turu", "") for r in bt_rows] if bt_rows else []
+                        if bt_ad.strip() in mevcutlar:
+                            st.error("❌ Bu bakım türü zaten mevcut!")
+                        else:
+                            ok_bt = sb_insert("bakim_turu_listesi", {"bakim_turu": bt_ad.strip(), "aktif": True})
+                            if ok_bt:
+                                log_yaz("BAKIM TÜRÜ EKLENDİ", bt_ad.strip())
+                                st.success(f"✅ '{bt_ad.strip()}' eklendi!")
+                                time.sleep(0.8)
+                                st.rerun()
+                            else:
+                                st.error("❌ Kayıt başarısız. 'bakim_turu_listesi' tablosunun Supabase'de oluşturulduğundan emin olun.")
+
+            if bt_rows:
+                st.markdown("---")
+                st.markdown("#### 🗑️ Bakım Türü Sil")
+                with st.form("bakim_turu_sil_formu"):
+                    sil_secenekler = [f"[ID:{r['id']}] {r.get('bakim_turu','')}" for r in bt_rows]
+                    sil_secim = st.selectbox("Silinecek Tür", sil_secenekler, key="bt_sil_sec")
+                    if st.form_submit_button("🗑️ Türü Sil (Pasifleştir)", use_container_width=True):
+                        sil_bt_id = int(sil_secim.split("ID:")[1].split("]")[0])
+                        sb_update("bakim_turu_listesi", f"id=eq.{sil_bt_id}", {"aktif": False})
+                        log_yaz("BAKIM TÜRÜ SİLİNDİ", sil_secim)
+                        st.success("Silindi.")
+                        time.sleep(0.6)
+                        st.rerun()
+        # ─────────────────────────────────────────────────────────────────────
 
         st.markdown("---")
         st.markdown("### ☑️ Checklist Yönetimi")
@@ -2172,6 +2243,37 @@ with tab_ayar:
                         log_yaz("MAKİNE EKLENDİ", f"{m_bolge} — {m_ad}")
                         st.success(f"✅ {m_ad} eklendi!")
                         st.rerun()
+
+            st.markdown("---")
+            st.markdown("#### 🔧 Bakım Türü Listesi Yönetimi")
+            with st.expander("Bakım Türü Ekle / Sil", expanded=False):
+                bt_rows2 = sb_select("bakim_turu_listesi", "aktif=eq.true")
+                if bt_rows2:
+                    df_bt2 = pd.DataFrame(bt_rows2)[["id", "bakim_turu"]]
+                    df_bt2.columns = ["ID", "Bakım Türü"]
+                    st.dataframe(df_bt2, use_container_width=True, hide_index=True)
+                else:
+                    st.caption("Henüz eklenmemiş — sabit liste kullanılıyor (Yağlama & Gres, Fren Testi, vb.).")
+                with st.form("bakim_turu_ekle_ayar"):
+                    bt_ad2 = st.text_input("Bakım Türü Adı", placeholder="Örn: Termal Kamera Kontrolü")
+                    if st.form_submit_button("➕ Ekle", use_container_width=True) and bt_ad2.strip():
+                        mevcutlar2 = [r.get("bakim_turu", "") for r in bt_rows2] if bt_rows2 else []
+                        if bt_ad2.strip() in mevcutlar2:
+                            st.error("❌ Bu bakım türü zaten mevcut!")
+                        else:
+                            sb_insert("bakim_turu_listesi", {"bakim_turu": bt_ad2.strip(), "aktif": True})
+                            log_yaz("BAKIM TÜRÜ EKLENDİ", bt_ad2.strip())
+                            st.success(f"✅ {bt_ad2} eklendi!")
+                            st.rerun()
+                if bt_rows2:
+                    sil_bt2 = st.selectbox("Silinecek Tür", [r.get("bakim_turu","") for r in bt_rows2], key="bt_sil_sec_ayar")
+                    if st.button("🗑️ Türü Sil", key="bt_sil_btn_ayar"):
+                        eslesen = next((r for r in bt_rows2 if r.get("bakim_turu","") == sil_bt2), None)
+                        if eslesen:
+                            sb_update("bakim_turu_listesi", f"id=eq.{eslesen['id']}", {"aktif": False})
+                            log_yaz("BAKIM TÜRÜ SİLİNDİ", sil_bt2)
+                            st.success("Silindi.")
+                            st.rerun()
 
             st.markdown("---")
             st.markdown("#### 📜 Sistem Aktivite Logu")

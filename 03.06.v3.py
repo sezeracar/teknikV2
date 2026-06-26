@@ -230,6 +230,7 @@ ARIZA_KOLON_MAP = {
     "malzeme_maliyeti": "Malzeme Maliyeti (TL)", "isguc_maliyeti": "İş Gücü Maliyeti (TL)",
     "toplam_maliyet": "Toplam Maliyet (TL)", "fotograf_notu": "Fotoğraf Notu",
     "kapatma_onayi": "Kapatma Onayı", "kapatma_foto_url": "Kapatma Fotoğrafı",
+    "acilis_foto_url": "Açılış Fotoğrafı",
 }
 
 STOK_KOLON_MAP = {
@@ -403,7 +404,7 @@ def email_alicilari_getir(kategori):
     except Exception:
         return []
 
-def email_gonder(konu, icerik, kategori="haftalik_rapor"):
+def email_gonder(konu, icerik, kategori="haftalik_rapor", foto_url=None):
     try:
         import smtplib
         from email.mime.text import MIMEText
@@ -427,10 +428,20 @@ def email_gonder(konu, icerik, kategori="haftalik_rapor"):
         msg["Subject"] = f"[TeknikPro CMMS] {konu}"
         msg["From"]    = f"TeknikPro CMMS <{gonderici}>"
         msg["To"]      = ", ".join(alicilar)
+        foto_html = ""
+        if foto_url:
+            foto_html = f"""
+            <div style="margin-top:16px;">
+              <div style="font-size:12px;color:#94a3b8;font-weight:600;margin-bottom:8px;">📷 KAPATMA FOTOĞRAFI</div>
+              <a href="{foto_url}" target="_blank">
+                <img src="{foto_url}" alt="Kapatma Fotoğrafı" style="max-width:100%;border-radius:8px;border:1px solid #334155;" />
+              </a>
+            </div>"""
         html = f"""<html><body style="font-family:Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:20px;">
           <div style="max-width:600px;margin:0 auto;background:#1e293b;border-radius:12px;padding:24px;border-left:4px solid #3b82f6;">
             <h2 style="color:#e2e8f0;margin:0 0 16px 0;">{konu}</h2>
             <div style="background:#0f172a;border-radius:8px;padding:16px;font-size:14px;line-height:1.8;color:#cbd5e1;white-space:pre-line;">{icerik}</div>
+            {foto_html}
             <div style="margin-top:20px;font-size:11px;color:#475569;border-top:1px solid #334155;padding-top:12px;">{datetime.now().strftime("%d/%m/%Y %H:%M")} — Adana LM / Tuzla LM</div>
           </div></body></html>"""
         msg.attach(MIMEText(html, "html", "utf-8"))
@@ -1076,6 +1087,17 @@ with tab_yeni:
         ariza_tanimi = st.text_area("📝 Arıza Tanımı *", placeholder="Arızanın belirti ve etkilerini açıklayın...", height=120)
         foto_notu    = st.text_input("📎 Fotoğraf / Referans Notu", placeholder="Opsiyonel")
 
+        st.markdown("#### 📷 Fotoğraf Ekle (Opsiyonel)")
+        if "acilis_foto_versiyon" not in st.session_state:
+            st.session_state["acilis_foto_versiyon"] = 0
+        yeni_foto = st.file_uploader(
+            "Arızanın fotoğrafını yükleyin",
+            type=["jpg", "jpeg", "png"],
+            key=f"yeni_foto_yukle_{st.session_state['acilis_foto_versiyon']}"
+        )
+        if yeni_foto:
+            st.image(yeni_foto, caption="Yüklenecek fotoğraf önizlemesi", width=250)
+
         sla_bilgi = ARIZA_ONCELIKLERI[oncelik]
         st.markdown(f"""
         <div style="background:rgba(61,0,102,0.6);border:1px solid rgba(255,215,0,0.15);border-radius:8px;padding:12px 16px;margin:8px 0;font-size:12px;">
@@ -1093,7 +1115,8 @@ with tab_yeni:
                 st.error("❌ Arıza Tanımı zorunludur.")
             else:
                 no = talep_no_uret()
-                ok = sb_insert("ariza_kayitlari", {
+                acilis_foto_url = sb_storage_upload(yeni_foto, no) if yeni_foto else None
+                ariza_kayit_verisi = {
                     "talep_no": no, "bolge": secili_bolge, "durum": "Açık",
                     "oncelik": oncelik, "vardiya": vardiya,
                     "acilis_tarihi": datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -1108,18 +1131,24 @@ with tab_yeni:
                     "kaizen_onerisi": "", "kullanilan_malzemeler": "",
                     "malzeme_maliyeti": 0, "isguc_maliyeti": 0, "toplam_maliyet": 0,
                     "fotograf_notu": foto_notu, "kapatma_onayi": ""
-                })
+                }
+                if acilis_foto_url:
+                    ariza_kayit_verisi["acilis_foto_url"] = acilis_foto_url
+                ok = sb_insert("ariza_kayitlari", ariza_kayit_verisi)
                 if ok:
                     cache_temizle()
                     st.session_state["_talep_gonderildi"] = True
+                    st.session_state["acilis_foto_versiyon"] = st.session_state.get("acilis_foto_versiyon", 0) + 1
                     log_yaz("YENİ TALEP", f"{no} — {secili_bolge} — {makine} — {bildiren}")
                     if "KRİTİK" in oncelik or "YÜKSEK" in oncelik:
                         email_gonder(
                             f"🚨 {oncelik[:10]} Arıza — {makine} ({secili_bolge})",
                             f"Talep No: {no}\nBölge: {secili_bolge}\nMakine: {makine}\nÖncelik: {oncelik}\nTanım: {ariza_tanimi.strip()}\nBildiren: {bildiren.strip()}",
-                            kategori="kritik_ariza"
+                            kategori="kritik_ariza",
+                            foto_url=acilis_foto_url
                         )
-                    st.success(f"✅ Talep **{no}** oluşturuldu! Bölge: {secili_bolge} | SLA: {sla_bilgi['sla_dk']} dk")
+                    foto_bilgi = " | 📷 Fotoğraf eklendi" if acilis_foto_url else (" | ⚠️ Fotoğraf yüklenemedi" if yeni_foto and not acilis_foto_url else "")
+                    st.success(f"✅ Talep **{no}** oluşturuldu! Bölge: {secili_bolge} | SLA: {sla_bilgi['sla_dk']} dk{foto_bilgi}")
                     time.sleep(1)
                     st.rerun()
                 else:
@@ -1191,6 +1220,10 @@ with tab_kapat:
                         📝 <em>{talep["Arıza Tanımı"]}</em>
                       </div>
                     </div>""", unsafe_allow_html=True)
+
+                    if str(talep.get("Açılış Fotoğrafı", "")).startswith("http"):
+                        with st.expander("📷 Açılışta Yüklenen Fotoğraf", expanded=False):
+                            st.image(talep["Açılış Fotoğrafı"], caption="Arıza Açılış Fotoğrafı", width=350)
 
                     st.markdown("#### 🔧 Müdahale & Çözüm Bilgileri")
                     ISCI_UCRET = 300
@@ -1395,7 +1428,8 @@ with tab_kapat:
                                     email_gonder(
                                         f"✅ Talep Kapatıldı — {talep.get('Makine', '')}",
                                         f"Talep No: {secilen_no}\nMakine: {talep.get('Makine','')}\nSüre: {cozum_dk} dk\nSLA: {sla_s['durum']}\nMaliyet: {toplam_maliyet_k:,.0f} TL",
-                                        kategori="talep_kapatma"
+                                        kategori="talep_kapatma",
+                                        foto_url=foto_url
                                     )
                                 foto_bilgi = " | 📷 Fotoğraf eklendi" if foto_url else (" | ⚠️ Fotoğraf yüklenemedi" if kapat_foto and not foto_url else "")
                                 st.success(f"✅ Talep **{secilen_no}** kapatıldı! Süre: {cozum_dk} dk | Toplam: {toplam_maliyet_k:,.0f} TL | {sla_s['durum']}{foto_bilgi}")
@@ -1478,17 +1512,32 @@ with tab_rapor:
                 except:
                     st.dataframe(g, use_container_width=True, hide_index=True)
 
-                if "Kapatma Fotoğrafı" in g.columns:
-                    fotolu = g[g["Kapatma Fotoğrafı"].astype(str).str.startswith("http", na=False)]
+                foto_kolonlari = [c for c in ["Açılış Fotoğrafı", "Kapatma Fotoğrafı"] if c in g.columns]
+                if foto_kolonlari:
+                    mask_foto = pd.Series(False, index=g.index)
+                    for fk in foto_kolonlari:
+                        mask_foto = mask_foto | g[fk].astype(str).str.startswith("http", na=False)
+                    fotolu = g[mask_foto]
                     if not fotolu.empty:
                         st.markdown("---")
-                        st.markdown("#### 📷 Kapatma Fotoğrafları")
+                        st.markdown("#### 📷 Talep Fotoğrafları")
                         foto_secenekler = fotolu.apply(lambda r: f"[{r['Talep No']}] {r.get('Makine','')}", axis=1).tolist()
                         foto_secim = st.selectbox("Fotoğraflı Talep Seç", foto_secenekler, key="foto_goster_sec")
                         foto_no = foto_secim.split("]")[0].replace("[", "").strip()
                         foto_satir = fotolu[fotolu["Talep No"] == foto_no]
                         if not foto_satir.empty:
-                            st.image(foto_satir["Kapatma Fotoğrafı"].values[0], caption=f"{foto_no} — Kapatma Fotoğrafı", width=400)
+                            col_fa, col_fb = st.columns(2)
+                            satir0 = foto_satir.iloc[0]
+                            with col_fa:
+                                if "Açılış Fotoğrafı" in g.columns and str(satir0.get("Açılış Fotoğrafı", "")).startswith("http"):
+                                    st.image(satir0["Açılış Fotoğrafı"], caption=f"{foto_no} — Açılış Fotoğrafı", width=350)
+                                else:
+                                    st.caption("Açılışta fotoğraf eklenmemiş.")
+                            with col_fb:
+                                if "Kapatma Fotoğrafı" in g.columns and str(satir0.get("Kapatma Fotoğrafı", "")).startswith("http"):
+                                    st.image(satir0["Kapatma Fotoğrafı"], caption=f"{foto_no} — Kapatma Fotoğrafı", width=350)
+                                else:
+                                    st.caption("Kapatmada fotoğraf eklenmemiş.")
 
             st.markdown("---")
             st.markdown("#### 📐 Makine Bazlı MTTR & MTBF Özeti")

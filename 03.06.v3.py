@@ -181,13 +181,9 @@ def sb_storage_upload(dosya, talep_no):
     Streamlit'in file_uploader'dan gelen dosyayı Supabase Storage'a yükler.
     Başarılı olursa public URL döner, olmazsa None döner.
     Bucket: ariza-fotograflari (public olarak oluşturulmalı)
-
-    NOT: Geçici olarak hata ayıklama (debug) bilgisi st.session_state'e yazılıyor.
-    Sorun çözülünce bu debug bilgisi kaldırılabilir.
     """
     try:
         if not sb_url() or not dosya:
-            st.session_state["_foto_debug"] = "sb_url() boş veya dosya yok."
             return None
         uzanti = dosya.name.split(".")[-1].lower()
         dosya_adi = f"{talep_no}_{int(time.time())}.{uzanti}"
@@ -199,13 +195,9 @@ def sb_storage_upload(dosya, talep_no):
         }
         r = requests.post(url, headers=headers, data=dosya.getvalue(), timeout=20)
         if r.ok:
-            st.session_state["_foto_debug"] = ""
             return f"{sb_url()}/storage/v1/object/public/{bucket}/{dosya_adi}"
-        else:
-            st.session_state["_foto_debug"] = f"HTTP {r.status_code} — {r.text[:300]}"
-            return None
-    except Exception as e:
-        st.session_state["_foto_debug"] = f"Exception: {e}"
+        return None
+    except Exception:
         return None
 
 def sb_to_df(rows, kolon_map=None):
@@ -1325,7 +1317,7 @@ with tab_kapat:
                       </div>
                     </div>""", unsafe_allow_html=True)
 
-                    with st.form("kapat_formu"):
+                    with st.form("kapat_formu", clear_on_submit=True):
                         mudahale_eden = st.text_input("Müdahale Eden Teknisyen *", value=mudahale_eden_dis, key="mud_eden_form")
                         kok_neden     = st.selectbox("🔍 Kök Neden", ["Yağlama eksikliği", "Aşınma (ömür tükenmesi)", "Hatalı kullanım", "Yetersiz bakım periyodu", "Tasarım/malzeme yetersizliği", "Dış etken (toz, nem, darbe)", "Yazılım/donanım arızası", "Bilinmiyor", "Diğer"])
                         kapat_onayi   = st.selectbox("✅ Kapatma Onayı", ["Teknisyen Onayı", "Vardiya Amiri Onayı", "Bakım Müdürü Onayı"])
@@ -1404,9 +1396,6 @@ with tab_kapat:
                                     )
                                 foto_bilgi = " | 📷 Fotoğraf eklendi" if foto_url else (" | ⚠️ Fotoğraf yüklenemedi" if kapat_foto and not foto_url else "")
                                 st.success(f"✅ Talep **{secilen_no}** kapatıldı! Süre: {cozum_dk} dk | Toplam: {toplam_maliyet_k:,.0f} TL | {sla_s['durum']}{foto_bilgi}")
-                                if kapat_foto and not foto_url and st.session_state.get("_foto_debug"):
-                                    st.error(f"🔍 Fotoğraf hata detayı: {st.session_state['_foto_debug']}")
-                                    st.stop()  # GEÇİCİ: hata mesajını okumak için otomatik yenilemeyi durduruyoruz
                                 time.sleep(1.5)
                                 st.rerun()
 

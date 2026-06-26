@@ -1335,10 +1335,12 @@ with tab_kapat:
                         malzeme_maliyet = st.number_input("Malzeme Maliyeti (TL)", min_value=0, step=50, value=0)
 
                         st.markdown("#### 📷 Fotoğraf Ekle (Opsiyonel)")
+                        if "foto_uploader_versiyon" not in st.session_state:
+                            st.session_state["foto_uploader_versiyon"] = 0
                         kapat_foto = st.file_uploader(
                             "Arıza/çözüm fotoğrafı yükleyin",
                             type=["jpg", "jpeg", "png"],
-                            key="kapat_foto_yukle"
+                            key=f"kapat_foto_yukle_{st.session_state['foto_uploader_versiyon']}"
                         )
                         if kapat_foto:
                             st.image(kapat_foto, caption="Yüklenecek fotoğraf önizlemesi", width=250)
@@ -1388,6 +1390,7 @@ with tab_kapat:
                                 sb_update("ariza_kayitlari", f"talep_no=eq.{secilen_no}", guncelleme_verisi)
                                 cache_temizle()
                                 log_yaz("TALEP KAPATILDI", f"{secilen_no} — {mudahale_eden} — {cozum_dk} dk — {toplam_maliyet_k:.0f} TL")
+                                st.session_state["foto_uploader_versiyon"] = st.session_state.get("foto_uploader_versiyon", 0) + 1
                                 if "KRİTİK" in str(talep.get("Öncelik", "")) or "YÜKSEK" in str(talep.get("Öncelik", "")):
                                     email_gonder(
                                         f"✅ Talep Kapatıldı — {talep.get('Makine', '')}",

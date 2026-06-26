@@ -176,6 +176,30 @@ def sb_delete(tablo, filtre):
     except Exception:
         return False
 
+def sb_storage_upload(dosya, talep_no):
+    """
+    Streamlit'in file_uploader'dan gelen dosyayı Supabase Storage'a yükler.
+    Başarılı olursa public URL döner, olmazsa None döner.
+    Bucket: ariza-fotograflari (public olarak oluşturulmalı)
+    """
+    try:
+        if not sb_url() or not dosya:
+            return None
+        uzanti = dosya.name.split(".")[-1].lower()
+        dosya_adi = f"{talep_no}_{int(time.time())}.{uzanti}"
+        bucket = "ariza-fotograflari"
+        url = f"{sb_url()}/storage/v1/object/{bucket}/{dosya_adi}"
+        headers = {
+            "Authorization": f"Bearer {sb_key()}",
+            "Content-Type": dosya.type or "image/jpeg",
+        }
+        r = requests.post(url, headers=headers, data=dosya.getvalue(), timeout=20)
+        if r.ok:
+            return f"{sb_url()}/storage/v1/object/public/{bucket}/{dosya_adi}"
+        return None
+    except Exception:
+        return None
+
 def sb_to_df(rows, kolon_map=None):
     if not rows:
         return pd.DataFrame()
@@ -205,7 +229,7 @@ ARIZA_KOLON_MAP = {
     "kaizen_onerisi": "Kaizen Önerisi", "kullanilan_malzemeler": "Kullanılan Malzemeler",
     "malzeme_maliyeti": "Malzeme Maliyeti (TL)", "isguc_maliyeti": "İş Gücü Maliyeti (TL)",
     "toplam_maliyet": "Toplam Maliyet (TL)", "fotograf_notu": "Fotoğraf Notu",
-    "kapatma_onayi": "Kapatma Onayı",
+    "kapatma_onayi": "Kapatma Onayı", "kapatma_foto_url": "Kapatma Fotoğrafı",
 }
 
 STOK_KOLON_MAP = {
@@ -1310,6 +1334,15 @@ with tab_kapat:
                         malzeme_adet    = st.number_input("Kullanılan Miktar", min_value=0, step=1, value=0)
                         malzeme_maliyet = st.number_input("Malzeme Maliyeti (TL)", min_value=0, step=50, value=0)
 
+                        st.markdown("#### 📷 Fotoğraf Ekle (Opsiyonel)")
+                        kapat_foto = st.file_uploader(
+                            "Arıza/çözüm fotoğrafı yükleyin",
+                            type=["jpg", "jpeg", "png"],
+                            key="kapat_foto_yukle"
+                        )
+                        if kapat_foto:
+                            st.image(kapat_foto, caption="Yüklenecek fotoğraf önizlemesi", width=250)
+
                         submit_kapat = st.form_submit_button("✅ Talebi Kapat & Kaydet", use_container_width=True)
 
                         if submit_kapat:
@@ -1335,7 +1368,9 @@ with tab_kapat:
                                 kapat_zaman = datetime.now().strftime("%d/%m/%Y %H:%M")
                                 sla_s = sla_hesapla(talep["Öncelik"], talep["Açılış Tarihi"], kapat_zaman)
 
-                                sb_update("ariza_kayitlari", f"talep_no=eq.{secilen_no}", {
+                                foto_url = sb_storage_upload(kapat_foto, secilen_no) if kapat_foto else None
+
+                                guncelleme_verisi = {
                                     "durum": "Kapalı", "kapatma_tarihi": kapat_zaman,
                                     "mudahale_eden": mudahale_eden.strip(),
                                     "ilk_mudahale_saati": f"{mud_bas} - {mud_bit}",
@@ -1346,7 +1381,11 @@ with tab_kapat:
                                     "malzeme_maliyeti": float(malzeme_maliyet),
                                     "isguc_maliyeti": float(isguc), "toplam_maliyet": float(toplam_maliyet_k),
                                     "kapatma_onayi": str(kapat_onayi),
-                                })
+                                }
+                                if foto_url:
+                                    guncelleme_verisi["kapatma_foto_url"] = foto_url
+
+                                sb_update("ariza_kayitlari", f"talep_no=eq.{secilen_no}", guncelleme_verisi)
                                 cache_temizle()
                                 log_yaz("TALEP KAPATILDI", f"{secilen_no} — {mudahale_eden} — {cozum_dk} dk — {toplam_maliyet_k:.0f} TL")
                                 if "KRİTİK" in str(talep.get("Öncelik", "")) or "YÜKSEK" in str(talep.get("Öncelik", "")):
@@ -1355,7 +1394,8 @@ with tab_kapat:
                                         f"Talep No: {secilen_no}\nMakine: {talep.get('Makine','')}\nSüre: {cozum_dk} dk\nSLA: {sla_s['durum']}\nMaliyet: {toplam_maliyet_k:,.0f} TL",
                                         kategori="talep_kapatma"
                                     )
-                                st.success(f"✅ Talep **{secilen_no}** kapatıldı! Süre: {cozum_dk} dk | Toplam: {toplam_maliyet_k:,.0f} TL | {sla_s['durum']}")
+                                foto_bilgi = " | 📷 Fotoğraf eklendi" if foto_url else (" | ⚠️ Fotoğraf yüklenemedi" if kapat_foto and not foto_url else "")
+                                st.success(f"✅ Talep **{secilen_no}** kapatıldı! Süre: {cozum_dk} dk | Toplam: {toplam_maliyet_k:,.0f} TL | {sla_s['durum']}{foto_bilgi}")
                                 time.sleep(1.5)
                                 st.rerun()
 
@@ -1434,6 +1474,18 @@ with tab_rapor:
                         st.dataframe(g, use_container_width=True, hide_index=True)
                 except:
                     st.dataframe(g, use_container_width=True, hide_index=True)
+
+                if "Kapatma Fotoğrafı" in g.columns:
+                    fotolu = g[g["Kapatma Fotoğrafı"].astype(str).str.startswith("http", na=False)]
+                    if not fotolu.empty:
+                        st.markdown("---")
+                        st.markdown("#### 📷 Kapatma Fotoğrafları")
+                        foto_secenekler = fotolu.apply(lambda r: f"[{r['Talep No']}] {r.get('Makine','')}", axis=1).tolist()
+                        foto_secim = st.selectbox("Fotoğraflı Talep Seç", foto_secenekler, key="foto_goster_sec")
+                        foto_no = foto_secim.split("]")[0].replace("[", "").strip()
+                        foto_satir = fotolu[fotolu["Talep No"] == foto_no]
+                        if not foto_satir.empty:
+                            st.image(foto_satir["Kapatma Fotoğrafı"].values[0], caption=f"{foto_no} — Kapatma Fotoğrafı", width=400)
 
             st.markdown("---")
             st.markdown("#### 📐 Makine Bazlı MTTR & MTBF Özeti")

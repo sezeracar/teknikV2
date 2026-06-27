@@ -379,9 +379,29 @@ def auth_giris_yap(email, sifre):
         st.session_state.aktif_kullanici = email
         st.session_state.aktif_tam_ad    = profil.get("tam_ad", email)
         st.session_state.aktif_rol       = profil.get("rol", "Operatör")
+        st.session_state["ilk_giris"]    = profil.get("ilk_giris", False)
         return True, ""
     except Exception as e:
         return False, f"Bağlantı hatası: {e}"
+
+def sifre_degistir(yeni_sifre):
+    """
+    Giriş yapmış kullanıcının kendi şifresini değiştirir (kendi token'ıyla,
+    service_key gerektirmez). Başarılıysa profildeki ilk_giris flag'ini false yapar.
+    """
+    try:
+        token = st.session_state.get("sb_access_token")
+        if not token:
+            return False, "Oturum bulunamadı."
+        headers = {"apikey": sb_key(), "Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        r = requests.put(f"{sb_url()}/auth/v1/user", headers=headers, json={"password": yeni_sifre}, timeout=10)
+        if not r.ok:
+            return False, r.json().get("msg", r.text[:200])
+        sb_update("profiller", f"id=eq.{st.session_state.get('sb_user_id')}", {"ilk_giris": False})
+        st.session_state["ilk_giris"] = False
+        return True, ""
+    except Exception as e:
+        return False, f"Hata: {e}"
 
 def auth_cikis_yap():
     for k in ["oturum_acik", "aktif_kullanici", "aktif_tam_ad", "aktif_rol",
@@ -978,6 +998,31 @@ with tab_pano:
                             else:
                                 st.error(f"❌ {hata}")
     else:
+        if st.session_state.get("ilk_giris", False):
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.warning("🔒 Güvenlik nedeniyle, devam etmeden önce şifrenizi değiştirmeniz gerekiyor.")
+                with st.form("ilk_sifre_degistir_formu"):
+                    st.markdown("<div style='text-align:center;font-size:18px;font-weight:700;color:#FFD700;margin-bottom:12px;'>🔑 Yeni Şifre Belirle</div>", unsafe_allow_html=True)
+                    yeni_s1 = st.text_input("Yeni Şifre", type="password", placeholder="En az 6 karakter")
+                    yeni_s2 = st.text_input("Yeni Şifre (Tekrar)", type="password")
+                    sif_btn = st.form_submit_button("Şifreyi Kaydet ve Devam Et →", use_container_width=True)
+                    if sif_btn:
+                        if len(yeni_s1) < 6:
+                            st.error("❌ Şifre en az 6 karakter olmalı.")
+                        elif yeni_s1 != yeni_s2:
+                            st.error("❌ Şifreler eşleşmiyor.")
+                        else:
+                            ok_s, hata_s = sifre_degistir(yeni_s1)
+                            if ok_s:
+                                log_yaz("ŞİFRE DEĞİŞTİRİLDİ", f"{st.session_state.aktif_tam_ad} ilk girişte şifresini değiştirdi")
+                                st.success("✅ Şifreniz güncellendi! Yönlendiriliyorsunuz...")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {hata_s}")
+            st.stop()
+
         col_ref, _ = st.columns([1, 8])
         with col_ref:
             if st.button("🔄 Yenile", use_container_width=True):
@@ -2404,7 +2449,7 @@ with tab_ayar:
         eski_kullanicilar = sb_select_admin("kullanicilar")
         if eski_kullanicilar:
             with st.expander(f"🔄 Eski Sistemden Kullanıcı Taşı ({len(eski_kullanicilar)} kullanıcı bulundu)", expanded=False):
-                st.info("Bu, eski `kullanicilar` tablosundaki kullanıcıları yeni Supabase Auth sistemine taşır. Her biri için **yeni** bir şifre üretilir (eski şifreler geri alınamaz). Şifreleri ilgili kişilere iletmen gerekecek.")
+                st.info("Bu, eski `kullanicilar` tablosundaki kullanıcıları yeni Supabase Auth sistemine taşır. Tüm kullanıcılara aynı (ortak) başlangıç şifresi verilir — ilk girişte sistem onlardan şifre değiştirmelerini isteyecek.")
                 mevcut_eslestirme = sb_select("kullanici_email_eslestirme")
                 tasinmis_adlar = {e["kullanici_adi"] for e in mevcut_eslestirme} if mevcut_eslestirme else set()
                 tasinmamislar = [k for k in eski_kullanicilar if k["kullanici_adi"] not in tasinmis_adlar]
@@ -2413,14 +2458,17 @@ with tab_ayar:
                     st.success("✅ Tüm eski kullanıcılar zaten taşınmış.")
                 else:
                     st.write(f"Taşınacak: {', '.join([k['kullanici_adi'] for k in tasinmamislar])}")
+                    ortak_sifre = st.text_input("Tüm kullanıcılara verilecek başlangıç şifresi", value="1905", help="En az 6 karakter olmalı. İlk girişte herkesten bu şifreyi değiştirmesi istenecek.")
                     if st.button("🚀 Şimdi Taşı", use_container_width=True, key="eski_kullanici_tasi_btn"):
                         if not sb_service_key():
                             st.error("❌ `service_key` secrets'a eklenmemiş, taşıma yapılamıyor.")
+                        elif len(ortak_sifre) < 6:
+                            st.error("❌ Başlangıç şifresi en az 6 karakter olmalı.")
                         else:
                             sonuc_listesi = []
                             for k in tasinmamislar:
                                 kul_adi = k["kullanici_adi"]
-                                yeni_sifre = "".join(pysecrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+                                yeni_sifre = ortak_sifre
                                 sahte_email = f"{kul_adi}@teknikpro.local"
                                 r_yeni = requests.post(
                                     f"{sb_url()}/auth/v1/admin/users",
@@ -2433,10 +2481,10 @@ with tab_ayar:
                                     sb_insert("profiller", {
                                         "id": yeni_id, "tam_ad": k.get("tam_ad", kul_adi),
                                         "rol": k.get("rol", "Operatör"), "aktif": True,
-                                        "kullanici_adi": kul_adi
+                                        "kullanici_adi": kul_adi, "ilk_giris": True
                                     })
                                     sb_insert("kullanici_email_eslestirme", {"kullanici_adi": kul_adi, "email": sahte_email})
-                                    sonuc_listesi.append({"Kullanıcı Adı": kul_adi, "Ad Soyad": k.get("tam_ad", ""), "Rol": k.get("rol", ""), "Yeni Şifre": yeni_sifre})
+                                    sonuc_listesi.append({"Kullanıcı Adı": kul_adi, "Ad Soyad": k.get("tam_ad", ""), "Rol": k.get("rol", ""), "Başlangıç Şifresi": yeni_sifre})
                                 else:
                                     sonuc_listesi.append({"Kullanıcı Adı": kul_adi, "Ad Soyad": k.get("tam_ad", ""), "Rol": "HATA", "Yeni Şifre": r_yeni.text[:80]})
                             cache_temizle()
@@ -2530,7 +2578,7 @@ with tab_ayar:
                             )
                             if r_yeni.ok:
                                 yeni_id = r_yeni.json().get("id")
-                                profil_verisi = {"id": yeni_id, "tam_ad": y_ad2.strip(), "rol": y_rol2, "aktif": True}
+                                profil_verisi = {"id": yeni_id, "tam_ad": y_ad2.strip(), "rol": y_rol2, "aktif": True, "ilk_giris": True}
                                 if kul_adi:
                                     profil_verisi["kullanici_adi"] = kul_adi
                                 sb_insert("profiller", profil_verisi)

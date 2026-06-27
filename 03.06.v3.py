@@ -111,12 +111,40 @@ def sb_key():
     except Exception:
         return ""
 
-def sb_headers():
+def sb_service_key():
+    """
+    Sadece kullanıcı yönetimi (admin) işlemleri için kullanılır — örn. yeni
+    kullanıcı oluşturma. Veri sorgularında (sb_select/insert/update/delete)
+    KULLANILMAZ, böylece RLS her zaman geçerli kalır.
+    """
+    try:
+        return st.secrets["supabase"]["service_key"]
+    except Exception:
+        return ""
+
+def aktif_token():
+    """
+    Giriş yapmış kullanıcının Supabase Auth access token'ı varsa onu döner.
+    Yoksa (girişsiz/anon durum, örn. Yeni Talep Aç formu) anon key'e düşer.
+    Bu sayede her sorgu, kullanıcının gerçek rolüne göre RLS'den geçer.
+    """
+    return st.session_state.get("sb_access_token") or sb_key()
+
+def sb_headers(token=None):
+    aktif = token or aktif_token()
     return {
         "apikey":        sb_key(),
-        "Authorization": f"Bearer {sb_key()}",
+        "Authorization": f"Bearer {aktif}",
         "Content-Type":  "application/json",
         "Prefer":        "return=representation"
+    }
+
+def sb_admin_headers():
+    """Sadece kullanıcı oluşturma/silme gibi admin API çağrıları için."""
+    return {
+        "apikey":        sb_key(),
+        "Authorization": f"Bearer {sb_service_key()}",
+        "Content-Type":  "application/json",
     }
 
 def secrets_kontrol():
@@ -258,13 +286,69 @@ def stok_df_getir():
 
 @st.cache_data(ttl=60)
 def kullanicilar_getir():
+    """
+    Eski isimle uyumluluk için bırakıldı — artık 'profiller' + auth.users
+    listesini Admin API üzerinden çeker. Sadece 'Kullanıcı Listesi' görünümü
+    içindir, login akışı bunu kullanmaz.
+    """
     try:
-        rows = sb_select("kullanicilar")
-        if not rows:
+        if not sb_service_key():
             return {}
-        return {r["kullanici_adi"]: {"sifre": r["sifre_hash"], "rol": r["rol"], "tam_ad": r["tam_ad"]} for r in rows}
+        url = f"{sb_url()}/auth/v1/admin/users"
+        r = requests.get(url, headers=sb_admin_headers(), timeout=10)
+        if not r.ok:
+            return {}
+        kullanicilar_auth = {u["id"]: u.get("email", "") for u in r.json().get("users", [])}
+        profil_rows = sb_select("profiller")
+        sonuc = {}
+        for p in profil_rows:
+            email = kullanicilar_auth.get(p["id"], "")
+            sonuc[email] = {"id": p["id"], "tam_ad": p.get("tam_ad", ""), "rol": p.get("rol", "Operatör")}
+        return sonuc
     except Exception:
         return {}
+
+def auth_giris_yap(email, sifre):
+    """
+    Supabase Auth ile email + şifre ile giriş yapar.
+    Başarılıysa session_state'e access_token, tam_ad, rol bilgilerini yazar.
+    """
+    try:
+        url = f"{sb_url()}/auth/v1/token?grant_type=password"
+        headers = {"apikey": sb_key(), "Content-Type": "application/json"}
+        r = requests.post(url, headers=headers, json={"email": email, "password": sifre}, timeout=10)
+        if not r.ok:
+            return False, "Hatalı e-posta veya şifre."
+        data = r.json()
+        access_token = data.get("access_token")
+        user_id = data.get("user", {}).get("id")
+        if not access_token or not user_id:
+            return False, "Giriş başarısız."
+
+        # Kullanıcının kendi profilini, kendi token'ıyla çek (RLS: kendi profilini görebilir)
+        profil_url = f"{sb_url()}/rest/v1/profiller?id=eq.{user_id}"
+        profil_headers = {"apikey": sb_key(), "Authorization": f"Bearer {access_token}"}
+        pr = requests.get(profil_url, headers=profil_headers, timeout=10)
+        profil = pr.json()[0] if pr.ok and pr.json() else {"tam_ad": email, "rol": "Operatör"}
+
+        if not profil.get("aktif", True):
+            return False, "Bu hesap pasif durumda. Yöneticinizle iletişime geçin."
+
+        st.session_state["sb_access_token"] = access_token
+        st.session_state["sb_refresh_token"] = data.get("refresh_token")
+        st.session_state["sb_user_id"] = user_id
+        st.session_state.oturum_acik     = True
+        st.session_state.aktif_kullanici = email
+        st.session_state.aktif_tam_ad    = profil.get("tam_ad", email)
+        st.session_state.aktif_rol       = profil.get("rol", "Operatör")
+        return True, ""
+    except Exception as e:
+        return False, f"Bağlantı hatası: {e}"
+
+def auth_cikis_yap():
+    for k in ["oturum_acik", "aktif_kullanici", "aktif_tam_ad", "aktif_rol",
+              "sb_access_token", "sb_refresh_token", "sb_user_id"]:
+        st.session_state.pop(k, None)
 
 def makine_listesi_db():
     try:
@@ -373,14 +457,10 @@ def veritabani_hazirla():
         ]
         for s in baslangic:
             sb_insert("stok", s)
-    if not sb_select("kullanicilar"):
-        for k in [
-            {"kullanici_adi": "admin",    "sifre_hash": hashlib.sha256("1905".encode()).hexdigest(), "tam_ad": "Sistem Yöneticisi", "rol": "Yönetici"},
-            {"kullanici_adi": "sezer",    "sifre_hash": hashlib.sha256("1905".encode()).hexdigest(), "tam_ad": "Sezer Bey", "rol": "Yönetici"},
-            {"kullanici_adi": "teknik01", "sifre_hash": hashlib.sha256("1905".encode()).hexdigest(), "tam_ad": "Teknisyen 1", "rol": "Teknisyen"},
-            {"kullanici_adi": "uretim",   "sifre_hash": hashlib.sha256("1905".encode()).hexdigest(), "tam_ad": "Üretim Operatörü", "rol": "Operatör"},
-        ]:
-            sb_insert("kullanicilar", k)
+    # NOT: Kullanıcılar artık Supabase Auth + profiller tablosu üzerinden
+    # yönetiliyor. Varsayılan/sabit şifreli kullanıcı oluşturma kaldırıldı.
+    # İlk yönetici kullanıcısını Supabase Dashboard → Authentication → Users
+    # üzerinden manuel oluşturup, profiller tablosuna ekleyin (bkz. migration SQL).
 
 secrets_kontrol()
 veritabani_hazirla()
@@ -665,7 +745,6 @@ header[data-testid="stHeader"] { display: none !important; }
 def sidebar_giris():
     with st.sidebar:
         st.markdown("---")
-        kullanicilar = kullanicilari_yukle()
         if not st.session_state.get("oturum_acik", False):
             try:
                 df_durum = ariza_df_getir()
@@ -712,8 +791,7 @@ def sidebar_giris():
             tick();setInterval(tick,1000);</script>""", height=24)
             if st.button("🚪 Çıkış Yap", use_container_width=True):
                 log_yaz("ÇIKIŞ", f"{tam_ad} sistemden çıktı")
-                for k in ["oturum_acik", "aktif_kullanici", "aktif_tam_ad", "aktif_rol"]:
-                    st.session_state.pop(k, None)
+                auth_cikis_yap()
                 st.rerun()
 
 def yetkili_mi(min_rol="Operatör"):
@@ -842,23 +920,21 @@ with tab_pano:
 
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            kullanicilar_login = kullanicilari_yukle()
-            with st.form("ana_giris_formu", clear_on_submit=True):
+            with st.form("ana_giris_formu", clear_on_submit=False):
                 st.markdown("<div style='text-align:center;font-size:20px;font-weight:700;color:#FFD700;margin-bottom:16px;'>🔐 Sistem Girişi</div>", unsafe_allow_html=True)
-                k_input = st.text_input("Kullanıcı Adı", placeholder="kullanici_adi")
+                e_input = st.text_input("E-posta", placeholder="ornek@gratis.com")
                 s_input = st.text_input("Şifre", type="password", placeholder="••••••")
                 giris_btn = st.form_submit_button("Giriş Yap →", use_container_width=True)
                 if giris_btn:
-                    k_input = k_input.strip().lower()
-                    if k_input in kullanicilar_login and kullanicilar_login[k_input]["sifre"] == sifre_hashle(s_input):
-                        st.session_state.oturum_acik     = True
-                        st.session_state.aktif_kullanici = k_input
-                        st.session_state.aktif_tam_ad    = kullanicilar_login[k_input]["tam_ad"]
-                        st.session_state.aktif_rol       = kullanicilar_login[k_input]["rol"]
-                        log_yaz("GİRİŞ", f"{kullanicilar_login[k_input]['tam_ad']} sisteme giriş yaptı")
-                        st.rerun()
+                    if not e_input.strip() or not s_input:
+                        st.error("❌ E-posta ve şifre zorunludur.")
                     else:
-                        st.error("❌ Hatalı kullanıcı adı veya şifre.")
+                        basarili, hata = auth_giris_yap(e_input.strip().lower(), s_input)
+                        if basarili:
+                            log_yaz("GİRİŞ", f"{st.session_state.aktif_tam_ad} sisteme giriş yaptı")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {hata}")
     else:
         col_ref, _ = st.columns([1, 8])
         with col_ref:
@@ -2281,52 +2357,84 @@ with tab_ayar:
 
         with col_a1:
             st.markdown("#### 👥 Kullanıcı Listesi")
-            kullanicilar = kullanicilari_yukle()
-            for k_ad, k_bilgi in kullanicilar.items():
-                st.markdown(f'<div class="durum-karti" style="padding:12px 16px;margin-bottom:8px;"><span style="font-weight:600;color:#e2e8f0;">{k_bilgi["tam_ad"]}</span><span style="font-size:12px;color:#64748b;margin-left:8px;">@{k_ad}</span><span class="sla-badge sla-ok" style="margin-left:8px;">{k_bilgi["rol"]}</span></div>', unsafe_allow_html=True)
+            if not sb_service_key():
+                st.warning("⚠️ Kullanıcı yönetimi için `service_key` secrets'a eklenmemiş. Sadece Supabase admin yetkisiyle çalışır.")
+            kullanicilar = kullanicilar_getir()
+            for k_email, k_bilgi in kullanicilar.items():
+                st.markdown(f'<div class="durum-karti" style="padding:12px 16px;margin-bottom:8px;"><span style="font-weight:600;color:#e2e8f0;">{k_bilgi["tam_ad"]}</span><span style="font-size:12px;color:#64748b;margin-left:8px;">{k_email}</span><span class="sla-badge sla-ok" style="margin-left:8px;">{k_bilgi["rol"]}</span></div>', unsafe_allow_html=True)
 
-            st.markdown("---")
-            st.markdown("#### ✏️ Kullanıcı Düzenle")
-            with st.form("kullanici_duzenle"):
-                duz_sec = st.selectbox("Düzenlenecek", list(kullanicilar.keys()), format_func=lambda k: f"{kullanicilar[k]['tam_ad']} (@{k})")
-                col_d1, col_d2 = st.columns(2)
-                with col_d1:
-                    duz_ad  = st.text_input("Ad Soyad", value=kullanicilar[duz_sec]["tam_ad"])
-                    duz_rol = st.selectbox("Rol", ["Operatör","Teknisyen","Yönetici"], index=["Operatör","Teknisyen","Yönetici"].index(kullanicilar[duz_sec]["rol"]))
-                with col_d2:
-                    duz_s1 = st.text_input("Yeni Şifre", type="password", placeholder="••••••")
-                    duz_s2 = st.text_input("Şifre Tekrar", type="password", placeholder="••••••")
-                if st.form_submit_button("💾 Kaydet", use_container_width=True):
-                    if duz_s1 and duz_s1 != duz_s2:
-                        st.error("❌ Şifreler eşleşmiyor!")
-                    else:
-                        gv = {"tam_ad": duz_ad.strip() or kullanicilar[duz_sec]["tam_ad"], "rol": duz_rol}
-                        if duz_s1: gv["sifre_hash"] = sifre_hashle(duz_s1)
-                        sb_update("kullanicilar", f"kullanici_adi=eq.{duz_sec}", gv)
-                        cache_temizle()
-                        log_yaz("KULLANICI GÜNCELLENDİ", f"{duz_sec}→{duz_rol}")
-                        st.success(f"✅ {duz_sec} güncellendi!")
-                        st.rerun()
+            if kullanicilar:
+                st.markdown("---")
+                st.markdown("#### ✏️ Kullanıcı Düzenle")
+                with st.form("kullanici_duzenle"):
+                    duz_sec = st.selectbox("Düzenlenecek", list(kullanicilar.keys()), format_func=lambda k: f"{kullanicilar[k]['tam_ad']} ({k})")
+                    col_d1, col_d2 = st.columns(2)
+                    with col_d1:
+                        duz_ad  = st.text_input("Ad Soyad", value=kullanicilar[duz_sec]["tam_ad"])
+                        duz_rol = st.selectbox("Rol", ["Operatör","Teknisyen","Yönetici"], index=["Operatör","Teknisyen","Yönetici"].index(kullanicilar[duz_sec]["rol"]))
+                    with col_d2:
+                        duz_s1 = st.text_input("Yeni Şifre", type="password", placeholder="••••••")
+                        duz_s2 = st.text_input("Şifre Tekrar", type="password", placeholder="••••••")
+                    if st.form_submit_button("💾 Kaydet", use_container_width=True):
+                        if duz_s1 and duz_s1 != duz_s2:
+                            st.error("❌ Şifreler eşleşmiyor!")
+                        else:
+                            duz_id = kullanicilar[duz_sec]["id"]
+                            # Profil bilgisi (ad/rol) güncellemesi — kullanıcının kendi authenticated token'ı ile (RLS: yönetici_profil_guncelle)
+                            sb_update("profiller", f"id=eq.{duz_id}", {"tam_ad": duz_ad.strip(), "rol": duz_rol})
+                            # Şifre değişikliği — Admin API (service_key) gerektirir
+                            if duz_s1:
+                                if not sb_service_key():
+                                    st.warning("⚠️ Şifre değiştirilemedi: `service_key` tanımlı değil.")
+                                else:
+                                    r_pw = requests.put(
+                                        f"{sb_url()}/auth/v1/admin/users/{duz_id}",
+                                        headers=sb_admin_headers(),
+                                        json={"password": duz_s1},
+                                        timeout=10
+                                    )
+                                    if not r_pw.ok:
+                                        st.warning(f"⚠️ Şifre güncellenemedi: {r_pw.text[:200]}")
+                            cache_temizle()
+                            log_yaz("KULLANICI GÜNCELLENDİ", f"{duz_sec}→{duz_rol}")
+                            st.success(f"✅ {duz_sec} güncellendi!")
+                            time.sleep(0.6)
+                            st.rerun()
 
             st.markdown("---")
             st.markdown("#### ➕ Yeni Kullanıcı Ekle")
             with st.form("yeni_kullanici"):
                 col_u1, col_u2 = st.columns(2)
                 with col_u1:
-                    y_kul  = st.text_input("Kullanıcı Adı")
-                    y_sif  = st.text_input("Şifre", type="password")
+                    y_email = st.text_input("E-posta", placeholder="ornek@gratis.com")
+                    y_sif   = st.text_input("Şifre", type="password")
                 with col_u2:
                     y_ad2  = st.text_input("Ad Soyad")
                     y_rol2 = st.selectbox("Rol", ["Operatör","Teknisyen","Yönetici"])
                 if st.form_submit_button("Kullanıcı Oluştur", use_container_width=True):
-                    if not all([y_kul, y_sif, y_ad2]): st.error("Tüm alanlar zorunludur.")
-                    elif y_kul.lower() in kullanicilar: st.error("Bu kullanıcı adı zaten mevcut.")
+                    if not all([y_email.strip(), y_sif, y_ad2.strip()]):
+                        st.error("Tüm alanlar zorunludur.")
+                    elif not sb_service_key():
+                        st.error("❌ `service_key` secrets'a eklenmemiş, kullanıcı oluşturulamıyor.")
+                    elif y_email.strip().lower() in kullanicilar:
+                        st.error("Bu e-posta zaten kayıtlı.")
                     else:
-                        sb_insert("kullanicilar", {"kullanici_adi": y_kul.lower(), "sifre_hash": sifre_hashle(y_sif), "rol": y_rol2, "tam_ad": y_ad2})
-                        cache_temizle()
-                        log_yaz("KULLANICI OLUŞTURULDU", f"{y_kul} — {y_rol2}")
-                        st.success(f"✅ {y_ad2} ({y_rol2}) oluşturuldu!")
-                        st.rerun()
+                        r_yeni = requests.post(
+                            f"{sb_url()}/auth/v1/admin/users",
+                            headers=sb_admin_headers(),
+                            json={"email": y_email.strip().lower(), "password": y_sif, "email_confirm": True},
+                            timeout=10
+                        )
+                        if r_yeni.ok:
+                            yeni_id = r_yeni.json().get("id")
+                            sb_insert("profiller", {"id": yeni_id, "tam_ad": y_ad2.strip(), "rol": y_rol2, "aktif": True})
+                            cache_temizle()
+                            log_yaz("KULLANICI OLUŞTURULDU", f"{y_email} — {y_rol2}")
+                            st.success(f"✅ {y_ad2} ({y_rol2}) oluşturuldu!")
+                            time.sleep(0.6)
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Kullanıcı oluşturulamadı: {r_yeni.text[:200]}")
 
         with col_a2:
             st.markdown("#### 🏭 Makine Listesi Yönetimi")

@@ -1057,10 +1057,34 @@ with tab_pano:
                     st.rerun()
             st.stop()
 
-        col_ref, _ = st.columns([1, 8])
+        col_ref, col_sif, col_cik, _ = st.columns([1.3, 1.6, 1.3, 5.8])
         with col_ref:
             if st.button("🔄 Yenile", use_container_width=True):
                 ariza_df_getir.clear()
+                st.rerun()
+        with col_sif:
+            with st.popover("🔑 Şifre Değiştir", use_container_width=True):
+                st.markdown("**Şifrenizi Değiştirin**")
+                with st.form("pano_sifre_degistir_formu", clear_on_submit=True):
+                    pano_s1 = st.text_input("Yeni Şifre", type="password", placeholder="En az 6 karakter", key="pano_yeni_s1")
+                    pano_s2 = st.text_input("Yeni Şifre (Tekrar)", type="password", key="pano_yeni_s2")
+                    pano_sif_btn = st.form_submit_button("Kaydet", use_container_width=True)
+                    if pano_sif_btn:
+                        if len(pano_s1) < 6:
+                            st.error("❌ Şifre en az 6 karakter olmalı.")
+                        elif pano_s1 != pano_s2:
+                            st.error("❌ Şifreler eşleşmiyor.")
+                        else:
+                            ok_p, hata_p = sifre_degistir(pano_s1)
+                            if ok_p:
+                                log_yaz("ŞİFRE DEĞİŞTİRİLDİ", f"{st.session_state.aktif_tam_ad} şifresini değiştirdi")
+                                st.success("✅ Şifreniz güncellendi!")
+                            else:
+                                st.error(f"❌ {hata_p}")
+        with col_cik:
+            if st.button("🚪 Çıkış Yap", use_container_width=True, key="pano_cikis_btn"):
+                log_yaz("ÇIKIŞ", f"{st.session_state.aktif_tam_ad} sistemden çıktı")
+                auth_cikis_yap()
                 st.rerun()
 
         df = ariza_df_getir()

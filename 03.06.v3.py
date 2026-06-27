@@ -2458,7 +2458,7 @@ with tab_ayar:
                     st.success("✅ Tüm eski kullanıcılar zaten taşınmış.")
                 else:
                     st.write(f"Taşınacak: {', '.join([k['kullanici_adi'] for k in tasinmamislar])}")
-                    ortak_sifre = st.text_input("Tüm kullanıcılara verilecek başlangıç şifresi", value="1905", help="En az 6 karakter olmalı. İlk girişte herkesten bu şifreyi değiştirmesi istenecek.")
+                    ortak_sifre = st.text_input("Tüm kullanıcılara verilecek başlangıç şifresi", value="111111", help="En az 6 karakter olmalı. İlk girişte herkesten bu şifreyi değiştirmesi istenecek.")
                     if st.button("🚀 Şimdi Taşı", use_container_width=True, key="eski_kullanici_tasi_btn"):
                         if not sb_service_key():
                             st.error("❌ `service_key` secrets'a eklenmemiş, taşıma yapılamıyor.")
@@ -2488,6 +2488,41 @@ with tab_ayar:
                                 else:
                                     sonuc_listesi.append({"Kullanıcı Adı": kul_adi, "Ad Soyad": k.get("tam_ad", ""), "Rol": "HATA", "Yeni Şifre": r_yeni.text[:80]})
                             cache_temizle()
+
+            # ── Zaten taşınmış ama rastgele şifreli kullanıcılar için toplu reset ──
+            if tasinmis_adlar:
+                with st.expander(f"🔁 Zaten Taşınmış {len(tasinmis_adlar)} Kullanıcının Şifresini Toplu Sıfırla", expanded=False):
+                    st.info("Daha önce taşınan kullanıcıların (rastgele/bilinmeyen) şifrelerini ortak bir şifreye sıfırlar ve ilk girişte değiştirmeye zorlar.")
+                    toplu_sifre = st.text_input("Yeni ortak şifre", value="111111", key="toplu_reset_sifre")
+                    if st.button("🔁 Şifreleri Sıfırla", use_container_width=True, key="toplu_reset_btn"):
+                        if not sb_service_key():
+                            st.error("❌ `service_key` secrets'a eklenmemiş.")
+                        elif len(toplu_sifre) < 6:
+                            st.error("❌ Şifre en az 6 karakter olmalı.")
+                        else:
+                            profil_rows_tum = sb_select("profiller")
+                            kul_adi_to_id = {p.get("kullanici_adi"): p["id"] for p in profil_rows_tum if p.get("kullanici_adi")}
+                            reset_sonuc = []
+                            for kul_adi in tasinmis_adlar:
+                                uid = kul_adi_to_id.get(kul_adi)
+                                if not uid:
+                                    reset_sonuc.append({"Kullanıcı Adı": kul_adi, "Durum": "profiller'de bulunamadı"})
+                                    continue
+                                r_reset = requests.put(
+                                    f"{sb_url()}/auth/v1/admin/users/{uid}",
+                                    headers=sb_admin_headers(),
+                                    json={"password": toplu_sifre},
+                                    timeout=10
+                                )
+                                if r_reset.ok:
+                                    sb_update("profiller", f"id=eq.{uid}", {"ilk_giris": True})
+                                    reset_sonuc.append({"Kullanıcı Adı": kul_adi, "Durum": "✅ Sıfırlandı", "Yeni Şifre": toplu_sifre})
+                                else:
+                                    reset_sonuc.append({"Kullanıcı Adı": kul_adi, "Durum": f"❌ {r_reset.text[:80]}"})
+                            cache_temizle()
+                            st.success("İşlem tamamlandı. Sonuçlar:")
+                            st.dataframe(pd.DataFrame(reset_sonuc), use_container_width=True, hide_index=True)
+                            st.warning("⚠️ Bu şifreyi ilgili kişilere güvenli şekilde iletin.")
                             log_yaz("ESKİ KULLANICILAR TAŞINDI", f"{len(sonuc_listesi)} kullanıcı")
                             st.success("✅ Taşıma tamamlandı! Aşağıdaki şifreleri not alıp ilgili kişilere iletin (bu liste sayfa yenilenince kaybolur):")
                             st.dataframe(pd.DataFrame(sonuc_listesi), use_container_width=True, hide_index=True)

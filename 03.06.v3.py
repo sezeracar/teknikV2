@@ -313,11 +313,14 @@ def kullanicilar_getir():
     """
     try:
         if not sb_service_key():
+            st.session_state["_admin_api_hata"] = "service_key tanımlı değil."
             return {}
         url = f"{sb_url()}/auth/v1/admin/users"
         r = requests.get(url, headers=sb_admin_headers(), timeout=10)
         if not r.ok:
+            st.session_state["_admin_api_hata"] = f"HTTP {r.status_code} — {r.text[:300]}"
             return {}
+        st.session_state["_admin_api_hata"] = ""
         kullanicilar_auth = {u["id"]: u.get("email", "") for u in r.json().get("users", [])}
         profil_rows = sb_select("profiller")
         sonuc = {}
@@ -325,7 +328,8 @@ def kullanicilar_getir():
             email = kullanicilar_auth.get(p["id"], "")
             sonuc[email] = {"id": p["id"], "tam_ad": p.get("tam_ad", ""), "rol": p.get("rol", "Operatör")}
         return sonuc
-    except Exception:
+    except Exception as e:
+        st.session_state["_admin_api_hata"] = f"Exception: {e}"
         return {}
 
 def kullanici_adindan_email_bul(kullanici_adi):
@@ -2391,6 +2395,10 @@ with tab_ayar:
         pass
     else:
         st.markdown("### ⚙️ Sistem Ayarları & Kullanıcı Yönetimi")
+
+        kullanicilar_onceki = kullanicilar_getir()
+        if st.session_state.get("_admin_api_hata"):
+            st.error(f"🔍 Admin API hata detayı: {st.session_state['_admin_api_hata']}")
 
         # ── BİR KERELİK: Eski kullanicilar tablosundaki kullanıcıları taşı ──
         eski_kullanicilar = sb_select_admin("kullanicilar")

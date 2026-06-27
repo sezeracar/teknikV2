@@ -8,6 +8,8 @@ import hashlib
 import json
 import time
 import requests
+import secrets as pysecrets
+import string
 
 BOLGELER = ["🏭 Adana LM", "🏭 Tuzla LM"]
 
@@ -146,6 +148,24 @@ def sb_admin_headers():
         "Authorization": f"Bearer {sb_service_key()}",
         "Content-Type":  "application/json",
     }
+
+def sb_select_admin(tablo, filtre=""):
+    """
+    service_key ile okur (RLS'i bypass eder). Sadece eski kullanicilar
+    tablosu gibi RLS ile kilitlenmiş tablolardan bir kerelik veri çekmek
+    için kullanılır (örn. eski kullanıcıları yeni sisteme taşıma).
+    """
+    try:
+        if not sb_url() or not sb_service_key():
+            return []
+        url = f"{sb_url()}/rest/v1/{tablo}?{filtre}&order=id.desc" if filtre else f"{sb_url()}/rest/v1/{tablo}?order=id.desc"
+        r = requests.get(url, headers=sb_admin_headers(), timeout=10)
+        if r.ok:
+            result = r.json()
+            return result if isinstance(result, list) else []
+        return []
+    except Exception:
+        return []
 
 def secrets_kontrol():
     try:
@@ -307,6 +327,20 @@ def kullanicilar_getir():
         return sonuc
     except Exception:
         return {}
+
+def kullanici_adindan_email_bul(kullanici_adi):
+    """
+    Kullanıcı adı -> dahili e-posta eşleştirmesini bulur (girişsiz çalışır).
+    Eşleştirme yoksa, kullanıcı adının zaten bir e-posta olduğunu varsayar
+    (yöneticiler gerçek e-postalarıyla giriş yapabilsin diye).
+    """
+    try:
+        rows = sb_select("kullanici_email_eslestirme", f"kullanici_adi=eq.{kullanici_adi}")
+        if rows:
+            return rows[0]["email"]
+    except Exception:
+        pass
+    return kullanici_adi if "@" in kullanici_adi else None
 
 def auth_giris_yap(email, sifre):
     """
@@ -922,19 +956,23 @@ with tab_pano:
         with col2:
             with st.form("ana_giris_formu", clear_on_submit=False):
                 st.markdown("<div style='text-align:center;font-size:20px;font-weight:700;color:#FFD700;margin-bottom:16px;'>🔐 Sistem Girişi</div>", unsafe_allow_html=True)
-                e_input = st.text_input("E-posta", placeholder="ornek@gratis.com")
+                e_input = st.text_input("Kullanıcı Adı veya E-posta", placeholder="kullanici_adi veya ornek@gratis.com")
                 s_input = st.text_input("Şifre", type="password", placeholder="••••••")
                 giris_btn = st.form_submit_button("Giriş Yap →", use_container_width=True)
                 if giris_btn:
                     if not e_input.strip() or not s_input:
-                        st.error("❌ E-posta ve şifre zorunludur.")
+                        st.error("❌ Kullanıcı adı/e-posta ve şifre zorunludur.")
                     else:
-                        basarili, hata = auth_giris_yap(e_input.strip().lower(), s_input)
-                        if basarili:
-                            log_yaz("GİRİŞ", f"{st.session_state.aktif_tam_ad} sisteme giriş yaptı")
-                            st.rerun()
+                        cozulen_email = kullanici_adindan_email_bul(e_input.strip().lower())
+                        if not cozulen_email:
+                            st.error("❌ Hatalı kullanıcı adı veya şifre.")
                         else:
-                            st.error(f"❌ {hata}")
+                            basarili, hata = auth_giris_yap(cozulen_email, s_input)
+                            if basarili:
+                                log_yaz("GİRİŞ", f"{st.session_state.aktif_tam_ad} sisteme giriş yaptı")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {hata}")
     else:
         col_ref, _ = st.columns([1, 8])
         with col_ref:
@@ -2353,6 +2391,52 @@ with tab_ayar:
         pass
     else:
         st.markdown("### ⚙️ Sistem Ayarları & Kullanıcı Yönetimi")
+
+        # ── BİR KERELİK: Eski kullanicilar tablosundaki kullanıcıları taşı ──
+        eski_kullanicilar = sb_select_admin("kullanicilar")
+        if eski_kullanicilar:
+            with st.expander(f"🔄 Eski Sistemden Kullanıcı Taşı ({len(eski_kullanicilar)} kullanıcı bulundu)", expanded=False):
+                st.info("Bu, eski `kullanicilar` tablosundaki kullanıcıları yeni Supabase Auth sistemine taşır. Her biri için **yeni** bir şifre üretilir (eski şifreler geri alınamaz). Şifreleri ilgili kişilere iletmen gerekecek.")
+                mevcut_eslestirme = sb_select("kullanici_email_eslestirme")
+                tasinmis_adlar = {e["kullanici_adi"] for e in mevcut_eslestirme} if mevcut_eslestirme else set()
+                tasinmamislar = [k for k in eski_kullanicilar if k["kullanici_adi"] not in tasinmis_adlar]
+
+                if not tasinmamislar:
+                    st.success("✅ Tüm eski kullanıcılar zaten taşınmış.")
+                else:
+                    st.write(f"Taşınacak: {', '.join([k['kullanici_adi'] for k in tasinmamislar])}")
+                    if st.button("🚀 Şimdi Taşı", use_container_width=True, key="eski_kullanici_tasi_btn"):
+                        if not sb_service_key():
+                            st.error("❌ `service_key` secrets'a eklenmemiş, taşıma yapılamıyor.")
+                        else:
+                            sonuc_listesi = []
+                            for k in tasinmamislar:
+                                kul_adi = k["kullanici_adi"]
+                                yeni_sifre = "".join(pysecrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+                                sahte_email = f"{kul_adi}@teknikpro.local"
+                                r_yeni = requests.post(
+                                    f"{sb_url()}/auth/v1/admin/users",
+                                    headers=sb_admin_headers(),
+                                    json={"email": sahte_email, "password": yeni_sifre, "email_confirm": True},
+                                    timeout=10
+                                )
+                                if r_yeni.ok:
+                                    yeni_id = r_yeni.json().get("id")
+                                    sb_insert("profiller", {
+                                        "id": yeni_id, "tam_ad": k.get("tam_ad", kul_adi),
+                                        "rol": k.get("rol", "Operatör"), "aktif": True,
+                                        "kullanici_adi": kul_adi
+                                    })
+                                    sb_insert("kullanici_email_eslestirme", {"kullanici_adi": kul_adi, "email": sahte_email})
+                                    sonuc_listesi.append({"Kullanıcı Adı": kul_adi, "Ad Soyad": k.get("tam_ad", ""), "Rol": k.get("rol", ""), "Yeni Şifre": yeni_sifre})
+                                else:
+                                    sonuc_listesi.append({"Kullanıcı Adı": kul_adi, "Ad Soyad": k.get("tam_ad", ""), "Rol": "HATA", "Yeni Şifre": r_yeni.text[:80]})
+                            cache_temizle()
+                            log_yaz("ESKİ KULLANICILAR TAŞINDI", f"{len(sonuc_listesi)} kullanıcı")
+                            st.success("✅ Taşıma tamamlandı! Aşağıdaki şifreleri not alıp ilgili kişilere iletin (bu liste sayfa yenilenince kaybolur):")
+                            st.dataframe(pd.DataFrame(sonuc_listesi), use_container_width=True, hide_index=True)
+                            st.warning("⚠️ Bu şifreleri güvenli bir şekilde (yüz yüze, şirket içi mesajlaşma vb.) iletin, ekran görüntüsünü paylaşmayın.")
+
         col_a1, col_a2 = st.columns(2)
 
         with col_a1:
@@ -2403,38 +2487,54 @@ with tab_ayar:
 
             st.markdown("---")
             st.markdown("#### ➕ Yeni Kullanıcı Ekle")
+            st.caption("E-postası olmayan personel için sadece 'Kullanıcı Adı' yeterli — sistem dahili bir adres atar.")
             with st.form("yeni_kullanici"):
+                giris_tipi = st.radio("Giriş Türü", ["Kullanıcı Adı (e-posta gerektirmez)", "E-posta"], horizontal=True)
                 col_u1, col_u2 = st.columns(2)
                 with col_u1:
-                    y_email = st.text_input("E-posta", placeholder="ornek@gratis.com")
+                    y_giris = st.text_input("Kullanıcı Adı veya E-posta", placeholder="teknik02  /  ornek@gratis.com")
                     y_sif   = st.text_input("Şifre", type="password")
                 with col_u2:
                     y_ad2  = st.text_input("Ad Soyad")
                     y_rol2 = st.selectbox("Rol", ["Operatör","Teknisyen","Yönetici"])
                 if st.form_submit_button("Kullanıcı Oluştur", use_container_width=True):
-                    if not all([y_email.strip(), y_sif, y_ad2.strip()]):
+                    if not all([y_giris.strip(), y_sif, y_ad2.strip()]):
                         st.error("Tüm alanlar zorunludur.")
                     elif not sb_service_key():
                         st.error("❌ `service_key` secrets'a eklenmemiş, kullanıcı oluşturulamıyor.")
-                    elif y_email.strip().lower() in kullanicilar:
-                        st.error("Bu e-posta zaten kayıtlı.")
                     else:
-                        r_yeni = requests.post(
-                            f"{sb_url()}/auth/v1/admin/users",
-                            headers=sb_admin_headers(),
-                            json={"email": y_email.strip().lower(), "password": y_sif, "email_confirm": True},
-                            timeout=10
-                        )
-                        if r_yeni.ok:
-                            yeni_id = r_yeni.json().get("id")
-                            sb_insert("profiller", {"id": yeni_id, "tam_ad": y_ad2.strip(), "rol": y_rol2, "aktif": True})
-                            cache_temizle()
-                            log_yaz("KULLANICI OLUŞTURULDU", f"{y_email} — {y_rol2}")
-                            st.success(f"✅ {y_ad2} ({y_rol2}) oluşturuldu!")
-                            time.sleep(0.6)
-                            st.rerun()
+                        kullanici_adi_girisi = "@" not in y_giris
+                        if kullanici_adi_girisi:
+                            kul_adi = y_giris.strip().lower()
+                            y_email_son = f"{kul_adi}@teknikpro.local"
                         else:
-                            st.error(f"❌ Kullanıcı oluşturulamadı: {r_yeni.text[:200]}")
+                            kul_adi = None
+                            y_email_son = y_giris.strip().lower()
+
+                        if y_email_son in kullanicilar:
+                            st.error("Bu kullanıcı zaten kayıtlı.")
+                        else:
+                            r_yeni = requests.post(
+                                f"{sb_url()}/auth/v1/admin/users",
+                                headers=sb_admin_headers(),
+                                json={"email": y_email_son, "password": y_sif, "email_confirm": True},
+                                timeout=10
+                            )
+                            if r_yeni.ok:
+                                yeni_id = r_yeni.json().get("id")
+                                profil_verisi = {"id": yeni_id, "tam_ad": y_ad2.strip(), "rol": y_rol2, "aktif": True}
+                                if kul_adi:
+                                    profil_verisi["kullanici_adi"] = kul_adi
+                                sb_insert("profiller", profil_verisi)
+                                if kul_adi:
+                                    sb_insert("kullanici_email_eslestirme", {"kullanici_adi": kul_adi, "email": y_email_son})
+                                cache_temizle()
+                                log_yaz("KULLANICI OLUŞTURULDU", f"{y_email_son} — {y_rol2}")
+                                st.success(f"✅ {y_ad2} ({y_rol2}) oluşturuldu! Giriş bilgisi: {kul_adi or y_email_son}")
+                                time.sleep(0.6)
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Kullanıcı oluşturulamadı: {r_yeni.text[:200]}")
 
         with col_a2:
             st.markdown("#### 🏭 Makine Listesi Yönetimi")

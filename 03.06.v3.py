@@ -192,6 +192,24 @@ def sb_select(tablo, filtre=""):
     except Exception:
         return []
 
+def sb_select_siralamasiz(tablo, filtre=""):
+    """
+    sb_select ile aynı ama 'order=id.desc' eklemez. 'id' kolonu olmayan
+    tablolar için (örn. kullanici_email_eslestirme — birincil anahtarı
+    kullanici_adi) kullanılır.
+    """
+    try:
+        if not sb_url():
+            return []
+        url = f"{sb_url()}/rest/v1/{tablo}?{filtre}" if filtre else f"{sb_url()}/rest/v1/{tablo}"
+        r = requests.get(url, headers=sb_headers(), timeout=10)
+        if r.ok:
+            result = r.json()
+            return result if isinstance(result, list) else []
+        return []
+    except Exception:
+        return []
+
 def sb_insert(tablo, veri):
     try:
         if not sb_url():
@@ -339,7 +357,7 @@ def kullanici_adindan_email_bul(kullanici_adi):
     (yöneticiler gerçek e-postalarıyla giriş yapabilsin diye).
     """
     try:
-        rows = sb_select("kullanici_email_eslestirme", f"kullanici_adi=eq.{kullanici_adi}")
+        rows = sb_select_siralamasiz("kullanici_email_eslestirme", f"kullanici_adi=eq.{kullanici_adi}")
         if rows:
             return rows[0]["email"]
     except Exception:
@@ -2450,7 +2468,7 @@ with tab_ayar:
         if eski_kullanicilar:
             with st.expander(f"🔄 Eski Sistemden Kullanıcı Taşı ({len(eski_kullanicilar)} kullanıcı bulundu)", expanded=False):
                 st.info("Bu, eski `kullanicilar` tablosundaki kullanıcıları yeni Supabase Auth sistemine taşır. Tüm kullanıcılara aynı (ortak) başlangıç şifresi verilir — ilk girişte sistem onlardan şifre değiştirmelerini isteyecek.")
-                mevcut_eslestirme = sb_select("kullanici_email_eslestirme")
+                mevcut_eslestirme = sb_select_siralamasiz("kullanici_email_eslestirme")
                 tasinmis_adlar = {e["kullanici_adi"] for e in mevcut_eslestirme} if mevcut_eslestirme else set()
                 tasinmamislar = [k for k in eski_kullanicilar if k["kullanici_adi"] not in tasinmis_adlar]
 

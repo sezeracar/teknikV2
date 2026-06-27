@@ -1052,6 +1052,9 @@ with tab_pano:
                                 st.rerun()
                             else:
                                 st.error(f"❌ {hata_s}")
+                if st.button("🚪 Çıkış Yap", use_container_width=True, key="ilk_giris_cikis_btn"):
+                    auth_cikis_yap()
+                    st.rerun()
             st.stop()
 
         col_ref, _ = st.columns([1, 8])

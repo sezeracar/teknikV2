@@ -350,6 +350,19 @@ def kullanicilar_getir():
         st.session_state["_admin_api_hata"] = f"Exception: {e}"
         return {}
 
+def sahte_email_uret(kullanici_adi):
+    """
+    Kullanıcı adından (Türkçe karakter içerebilir) geçerli bir e-posta
+    local-part'ı üretir. Örn: 'özgür' -> 'ozgur@teknikpro.local'
+    """
+    cevirim = {
+        "ç": "c", "Ç": "C", "ğ": "g", "Ğ": "G", "ı": "i", "İ": "I",
+        "ö": "o", "Ö": "O", "ş": "s", "Ş": "S", "ü": "u", "Ü": "U"
+    }
+    temiz = "".join(cevirim.get(ch, ch) for ch in kullanici_adi)
+    temiz = "".join(ch for ch in temiz.lower() if ch.isalnum() or ch in "._-")
+    return f"{temiz}@teknikpro.local"
+
 def kullanici_adindan_email_bul(kullanici_adi):
     """
     Kullanıcı adı -> dahili e-posta eşleştirmesini bulur (girişsiz çalışır).
@@ -2487,7 +2500,7 @@ with tab_ayar:
                             for k in tasinmamislar:
                                 kul_adi = k["kullanici_adi"]
                                 yeni_sifre = ortak_sifre
-                                sahte_email = f"{kul_adi}@teknikpro.local"
+                                sahte_email = sahte_email_uret(kul_adi)
                                 r_yeni = requests.post(
                                     f"{sb_url()}/auth/v1/admin/users",
                                     headers=sb_admin_headers(),
@@ -2615,7 +2628,7 @@ with tab_ayar:
                         kullanici_adi_girisi = "@" not in y_giris
                         if kullanici_adi_girisi:
                             kul_adi = y_giris.strip().lower()
-                            y_email_son = f"{kul_adi}@teknikpro.local"
+                            y_email_son = sahte_email_uret(kul_adi)
                         else:
                             kul_adi = None
                             y_email_son = y_giris.strip().lower()
